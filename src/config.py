@@ -52,7 +52,7 @@ class Config:
     
     # Ollama Configuration
     OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-    OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1:8b')
+    OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3:8b')
     OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '60'))
     
     # Hugging Face settings (fallback)
@@ -107,7 +107,7 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     AI_MODEL_TYPE = 'ollama'  # Default to Ollama for development
-    OLLAMA_MODEL = 'gemma:2b'  # Use 2B model for development (lower memory)
+    OLLAMA_MODEL = 'llama3:8b'  # Use recommended model for development
 
 class ProductionConfig(Config):
     """Production configuration."""

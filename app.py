@@ -11,6 +11,10 @@ from werkzeug.utils import secure_filename
 import logging
 from datetime import datetime
 import re
+from werkzeug.exceptions import RequestEntityTooLarge
+from flask_socketio import SocketIO, emit
+import uuid
+import time
 
 # Try to import our custom modules with fallbacks
 try:
@@ -206,6 +210,7 @@ app.config.from_object(Config)
 
 # Initialize extensions
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 db = SQLAlchemy(app)
 
 # Initialize processors with fallbacks
@@ -234,6 +239,44 @@ else:
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Progress tracking
+progress_sessions = {}
+
+def emit_progress(session_id, step, status, detail, progress_percent=None):
+    """Emit progress update to specific session"""
+    if session_id in progress_sessions:
+        socketio.emit('progress_update', {
+            'step': step,
+            'status': status,
+            'detail': detail,
+            'progress': progress_percent,
+            'timestamp': datetime.now().isoformat()
+        }, room=session_id)
+        logger.info(f"Progress update sent to {session_id}: {step} - {status}")
+
+def emit_completion(session_id, success, data=None, error=None):
+    """Emit completion status to specific session"""
+    if session_id in progress_sessions:
+        socketio.emit('process_complete', {
+            'success': success,
+            'data': data,
+            'error': error,
+            'timestamp': datetime.now().isoformat()
+        }, room=session_id)
+        logger.info(f"Completion sent to {session_id}: {'Success' if success else 'Error'}")
+
+@socketio.on('connect')
+def handle_connect():
+    session_id = str(uuid.uuid4())
+    progress_sessions[session_id] = True
+    emit('session_id', {'session_id': session_id})
+    logger.info(f"Client connected with session ID: {session_id}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    # Clean up session if needed
+    pass
 
 @app.route('/')
 def index():
@@ -276,7 +319,7 @@ def index():
                     </div>
                     <div class="feature">
                         <h4>🤖 AI Rewriting</h4>
-                        <p>Uses local Gemma 2B model for professional text improvements</p>
+                        <p>Uses local Llama 8B model for professional text improvements</p>
                     </div>
                     <div class="feature">
                         <h4>🔒 Privacy First</h4>
@@ -389,7 +432,7 @@ def index():
                     document.getElementById('errorCount').textContent = analysis.errors.length;
                     document.getElementById('readabilityScore').textContent = analysis.readability_score || 'N/A';
                     
-                    let html = '<div class="result"><h3>📊 Analysis Results</h3>';
+                    let html = '<div class="result"><h3>�� Analysis Results</h3>';
                     
                     if (analysis.errors.length === 0) {
                         html += '<div class="success">✅ No major style issues detected!</div>';
@@ -512,42 +555,76 @@ def upload_file():
 
 @app.route('/analyze', methods=['POST'])
 def analyze_content():
-    """Analyze content for style guide violations."""
+    """Analyze text content for style issues with real-time progress."""
     try:
         data = request.get_json()
         content = data.get('content', '')
+        session_id = data.get('session_id', '')
         
         if not content:
             return jsonify({'error': 'No content provided'}), 400
         
-        # Perform style analysis
-        analysis_results = style_analyzer.analyze(content)
+        # Send initial progress
+        emit_progress(session_id, 'analysis_start', 'Starting text analysis...', 
+                     'Initializing SpaCy NLP processor', 10)
+        
+        # Perform analysis
+        emit_progress(session_id, 'spacy_processing', 'Processing with SpaCy NLP...', 
+                     'Detecting sentence structure and style issues', 30)
+        
+        analysis = style_analyzer.analyze(content)
+        
+        emit_progress(session_id, 'metrics_calculation', 'Calculating readability metrics...', 
+                     'Computing Flesch, Fog, SMOG, and other scores', 60)
+        
+        # Add some processing time for metrics
+        time.sleep(0.5)  # Small delay to show progress
+        
+        emit_progress(session_id, 'analysis_complete', 'Analysis completed successfully!', 
+                     f'Found {len(analysis.get("errors", []))} style issues', 100)
         
         return jsonify({
             'success': True,
-            'analysis': analysis_results,
-            'error_count': len(analysis_results.get('errors', [])),
-            'suggestions_count': len(analysis_results.get('suggestions', []))
+            'analysis': analysis
         })
         
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
+        if 'session_id' in locals():
+            emit_completion(session_id, False, error=f'Analysis failed: {str(e)}')
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
 @app.route('/rewrite', methods=['POST'])
 def rewrite_content():
-    """Generate AI-powered rewrite suggestions based on detected errors."""
+    """Generate AI-powered rewrite suggestions (Pass 1)."""
     try:
         data = request.get_json()
         content = data.get('content', '')
         errors = data.get('errors', [])
-        context = data.get('context', 'sentence')  # sentence or paragraph
+        context = data.get('context', 'sentence')
+        session_id = data.get('session_id', '')
         
         if not content:
             return jsonify({'error': 'No content provided'}), 400
         
-        # Generate rewrite using AI
-        rewrite_result = ai_rewriter.rewrite(content, errors, context)
+        # Send initial progress
+        emit_progress(session_id, 'rewrite_start', 'Starting AI rewrite process...', 
+                     f'Processing {len(errors)} detected issues', 5)
+        
+        # Create progress callback function
+        def progress_callback(step, status, detail, progress):
+            emit_progress(session_id, step, status, detail, progress)
+        
+        # Create AI rewriter with progress callback
+        progress_ai_rewriter = AIRewriter(
+            model_name=ai_rewriter.model_name,
+            use_ollama=ai_rewriter.use_ollama,
+            ollama_model=ai_rewriter.ollama_model,
+            progress_callback=progress_callback
+        )
+        
+        # Perform Pass 1 rewrite with real-time progress
+        rewrite_result = progress_ai_rewriter.rewrite(content, errors, context, pass_number=1)
         
         return jsonify({
             'success': True,
@@ -556,12 +633,67 @@ def rewrite_content():
             'rewritten_text': rewrite_result.get('rewritten_text', ''),
             'improvements': rewrite_result.get('improvements', []),
             'confidence': rewrite_result.get('confidence', 0.0),
-            'model_used': rewrite_result.get('model_used', 'unknown')
+            'model_used': rewrite_result.get('model_used', 'unknown'),
+            'pass_number': rewrite_result.get('pass_number', 1),
+            'can_refine': rewrite_result.get('can_refine', False),
+            'original_errors': errors  # Store for potential Pass 2
         })
         
     except Exception as e:
         logger.error(f"Rewrite error: {str(e)}")
+        if 'session_id' in locals():
+            emit_completion(session_id, False, error=f'Rewrite failed: {str(e)}')
         return jsonify({'error': f'Rewrite failed: {str(e)}'}), 500
+
+@app.route('/refine', methods=['POST'])
+def refine_content():
+    """Generate AI-powered refinement (Pass 2)."""
+    try:
+        data = request.get_json()
+        first_pass_result = data.get('first_pass_result', '')
+        original_errors = data.get('original_errors', [])
+        context = data.get('context', 'sentence')
+        session_id = data.get('session_id', '')
+        
+        if not first_pass_result:
+            return jsonify({'error': 'No first pass result provided'}), 400
+        
+        # Send initial progress
+        emit_progress(session_id, 'refine_start', 'Starting AI refinement process...', 
+                     'AI reviewing and polishing the first pass result', 5)
+        
+        # Create progress callback function
+        def progress_callback(step, status, detail, progress):
+            emit_progress(session_id, step, status, detail, progress)
+        
+        # Create AI rewriter with progress callback
+        progress_ai_rewriter = AIRewriter(
+            model_name=ai_rewriter.model_name,
+            use_ollama=ai_rewriter.use_ollama,
+            ollama_model=ai_rewriter.ollama_model,
+            progress_callback=progress_callback
+        )
+        
+        # Perform Pass 2 refinement with real-time progress
+        refinement_result = progress_ai_rewriter.refine_text(first_pass_result, original_errors, context)
+        
+        return jsonify({
+            'success': True,
+            'first_pass': first_pass_result,
+            'refined': refinement_result.get('rewritten_text', ''),
+            'rewritten_text': refinement_result.get('rewritten_text', ''),
+            'improvements': refinement_result.get('improvements', []),
+            'confidence': refinement_result.get('confidence', 0.0),
+            'model_used': refinement_result.get('model_used', 'unknown'),
+            'pass_number': refinement_result.get('pass_number', 2),
+            'can_refine': refinement_result.get('can_refine', False)
+        })
+        
+    except Exception as e:
+        logger.error(f"Refinement error: {str(e)}")
+        if 'session_id' in locals():
+            emit_completion(session_id, False, error=f'Refinement failed: {str(e)}')
+        return jsonify({'error': f'Refinement failed: {str(e)}'}), 500
 
 @app.route('/health')
 def health_check():
@@ -622,26 +754,12 @@ def internal_error(error):
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
-    # Create database tables
-    with app.app_context():
-        db.create_all()
-    
     print("🚀 Starting Peer-review platform...")
-    print("📍 Visit: http://localhost:5000")
-    print(f"🧠 AI Model: {Config.AI_MODEL_TYPE} ({Config.OLLAMA_MODEL})")
+    print("📊 Style Analysis: ✅ Available" if STYLE_ANALYZER_AVAILABLE else "📊 Style Analysis: ⚠️ Using fallback")
+    print("📁 Document Processing: ✅ Available" if DOCUMENT_PROCESSOR_AVAILABLE else "📁 Document Processing: ⚠️ Using fallback")
+    print("🤖 AI Rewriting: ✅ Available" if AI_REWRITER_AVAILABLE else "🤖 AI Rewriting: ⚠️ Using fallback")
+    print("🌐 Server starting at: http://localhost:5000")
+    print("🔄 Real-time progress tracking: ✅ Enabled")
+    print()
     
-    # Dynamic status message based on actual availability
-    if DOCUMENT_PROCESSOR_AVAILABLE and STYLE_ANALYZER_AVAILABLE and AI_REWRITER_AVAILABLE:
-        print("✅ All enhanced NLP features are available!")
-    else:
-        missing = []
-        if not DOCUMENT_PROCESSOR_AVAILABLE:
-            missing.append("document processor")
-        if not STYLE_ANALYZER_AVAILABLE:
-            missing.append("style analyzer")
-        if not AI_REWRITER_AVAILABLE:
-            missing.append("AI rewriter")
-        print(f"🔧 Using fallback for: {', '.join(missing)}")
-    
-    # Run the application
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000) 
