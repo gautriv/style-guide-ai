@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Peer-review platform{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --light-bg: #f8f9fa;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #2980b9 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .error-highlight {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--danger-color);
+            padding: 2px 5px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        
+        .error-badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 15px;
+            margin-left: 5px;
+        }
+        
+        .error-high { background-color: var(--danger-color); }
+        .error-medium { background-color: var(--warning-color); }
+        .error-low { background-color: #95a5a6; }
+        
+        .statistics-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--secondary-color);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        
+        .analysis-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .rewrite-suggestion {
+            background-color: rgba(39, 174, 96, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .spinner-custom {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .floating-action {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+        
+        .progress-custom {
+            height: 8px;
+            border-radius: 10px;
+            background-color: rgba(255,255,255,0.2);
+        }
+        
+        .progress-bar-custom {
+            background: linear-gradient(90deg, var(--success-color) 0%, #2ecc71 100%);
+            border-radius: 10px;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-pen-fancy me-2"></i>
+                Peer-review platform
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-upload me-1"></i> Analyze
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('health_check') }}">
+                            <i class="fas fa-heartbeat me-1"></i> Health
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container my-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'info-circle' }} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light text-center py-4 mt-5">
+        <div class="container">
+            <p class="mb-0">
+                <i class="fas fa-code me-2"></i>
+                Peer-review platform - Powered by AI &copy; 2024
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Global variables
+        let currentAnalysis = null;
+        let currentContent = null;
+
+        // Utility functions
+        function showLoading(elementId, message = 'Processing...') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `
+                    <div class="text-center">
+                        <div class="spinner-custom mx-auto mb-3"></div>
+                        <p class="text-muted">${message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${message}
+                    </div>
+                `;
+            }
+        }
+
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        ${message}
+                    </div>
+                `;
+            }
+        }
+
+        // File upload handling
+        function handleFileUpload(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading('analysis-results', 'Uploading and processing file...');
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentContent = data.content;
+                    analyzeContent(data.content);
+                } else {
+                    showError('analysis-results', data.error || 'Upload failed');
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showError('analysis-results', 'Upload failed: ' + error.message);
+            });
+        }
+
+        // Content analysis
+        function analyzeContent(content) {
+            showLoading('analysis-results', 'Analyzing content...');
+
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentAnalysis = data.analysis;
+                    displayAnalysisResults(data.analysis, content);
+                } else {
+                    showError('analysis-results', data.error || 'Analysis failed');
+                }
+            })
+            .catch(error => {
+                console.error('Analysis error:', error);
+                showError('analysis-results', 'Analysis failed: ' + error.message);
+            });
+        }
+
+        // Display analysis results
+        function displayAnalysisResults(analysis, content) {
+            const resultsContainer = document.getElementById('analysis-results');
+            
+            let html = `
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Content Analysis</h5>
+                                <span class="badge ${analysis.overall_score >= 80 ? 'bg-success' : analysis.overall_score >= 60 ? 'bg-warning' : 'bg-danger'}">
+                                    Score: ${analysis.overall_score.toFixed(1)}%
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <h6>Original Content:</h6>
+                                    <div class="border rounded p-3 bg-light">
+                                        ${highlightErrors(content, analysis.errors)}
+                                    </div>
+                                </div>
+                                
+                                ${analysis.errors.length > 0 ? `
+                                <div class="mb-3">
+                                    <h6>Detected Issues (${analysis.errors.length}):</h6>
+                                    <div class="analysis-container">
+                                        ${analysis.errors.map(error => createErrorCard(error)).join('')}
+                                    </div>
+                                </div>
+                                ` : '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>No issues detected!</div>'}
+                                
+                                ${analysis.errors.length > 0 ? `
+                                <div class="text-center">
+                                    <button class="btn btn-primary btn-lg" onclick="rewriteContent()">
+                                        <i class="fas fa-magic me-2"></i>Rewrite with AI
+                                    </button>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card statistics-card text-white">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Technical Writing Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Basic Counts -->
+                                <div class="row text-center mb-3">
+                                    <div class="col-4">
+                                        <h4>${analysis.statistics.word_count || 0}</h4>
+                                        <small>Words</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <h4>${analysis.statistics.sentence_count || 0}</h4>
+                                        <small>Sentences</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <h4>${analysis.statistics.paragraph_count || 0}</h4>
+                                        <small>Paragraphs</small>
+                                    </div>
+                                </div>
+                                
+                                <!-- Grade Level Assessment -->
+                                <div class="text-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.1);">
+                                    <h4 class="text-warning">
+                                        ${analysis.technical_writing_metrics?.estimated_grade_level?.toFixed(1) || 'N/A'}
+                                    </h4>
+                                    <small>Grade Level</small>
+                                    <br>
+                                    <small class="text-muted">
+                                        ${analysis.technical_writing_metrics?.grade_level_category || 'Unknown'}
+                                    </small>
+                                    ${analysis.technical_writing_metrics?.meets_target_grade ? 
+                                        '<br><i class="fas fa-check-circle text-success"></i> <small>Target Met</small>' : 
+                                        '<br><i class="fas fa-exclamation-circle text-warning"></i> <small>Outside Target (9-11)</small>'
+                                    }
+                                </div>
+                                
+                                <!-- Readability Scores -->
+                                <div class="mb-3">
+                                    <h6 class="text-center mb-2">Readability Scores</h6>
+                                    <div class="row text-center small">
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.flesch_reading_ease || 0).toFixed(1)}</strong>
+                                            <br><small>Flesch Reading Ease</small>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.flesch_kincaid_grade || 0).toFixed(1)}</strong>
+                                            <br><small>Flesch-Kincaid Grade</small>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.gunning_fog_index || 0).toFixed(1)}</strong>
+                                            <br><small>Gunning Fog Index</small>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.smog_index || 0).toFixed(1)}</strong>
+                                            <br><small>SMOG Index</small>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.coleman_liau_index || 0).toFixed(1)}</strong>
+                                            <br><small>Coleman-Liau</small>
+                                        </div>
+                                        <div class="col-6 mb-2">
+                                            <strong>${(analysis.statistics.automated_readability_index || 0).toFixed(1)}</strong>
+                                            <br><small>ARI</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Overall Readability Rating -->
+                                <div class="text-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.1);">
+                                    <strong class="text-info">
+                                        ${analysis.technical_writing_metrics?.overall_readability_rating || 'Unknown'}
+                                    </strong>
+                                    <br><small>Overall Readability</small>
+                                </div>
+                                
+                                <!-- Technical Writing Metrics -->
+                                <div class="row text-center small mb-3">
+                                    <div class="col-4">
+                                        <strong>${(analysis.statistics.avg_sentence_length || 0).toFixed(1)}</strong>
+                                        <br><small>Avg Sentence Length</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <strong>${(analysis.statistics.avg_syllables_per_word || 0).toFixed(1)}</strong>
+                                        <br><small>Avg Syllables/Word</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <strong>${(analysis.statistics.passive_voice_percentage || 0).toFixed(1)}%</strong>
+                                        <br><small>Passive Voice</small>
+                                    </div>
+                                </div>
+                                
+                                <!-- Complex Words -->
+                                <div class="row text-center small mb-3">
+                                    <div class="col-6">
+                                        <strong>${analysis.statistics.complex_words_count || 0}</strong>
+                                        <br><small>Complex Words</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>${(analysis.statistics.complex_words_percentage || 0).toFixed(1)}%</strong>
+                                        <br><small>Complex Word %</small>
+                                    </div>
+                                </div>
+                                
+                                <!-- Technical Complexity Score -->
+                                <div class="text-center mb-3">
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar ${(analysis.statistics.technical_complexity_score || 0) > 75 ? 'bg-danger' : 
+                                            (analysis.statistics.technical_complexity_score || 0) > 50 ? 'bg-warning' : 'bg-success'}" 
+                                            role="progressbar" 
+                                            style="width: ${Math.min(100, analysis.statistics.technical_complexity_score || 0)}%">
+                                        </div>
+                                    </div>
+                                    <small>Technical Complexity: ${(analysis.statistics.technical_complexity_score || 0).toFixed(1)}/100</small>
+                                </div>
+                                
+                                <!-- Recommendations -->
+                                ${analysis.technical_writing_metrics?.readability_recommendations?.length > 0 ? `
+                                <div class="mt-3">
+                                    <h6 class="text-center">Key Recommendations</h6>
+                                    <ul class="list-unstyled small">
+                                        ${analysis.technical_writing_metrics.readability_recommendations.slice(0, 3).map(rec => `
+                                            <li><i class="fas fa-arrow-right me-1"></i> ${rec}</li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                                ` : ''}
+                                
+                                ${analysis.suggestions.length > 0 ? `
+                                <div class="mt-3">
+                                    <h6>General Suggestions:</h6>
+                                    ${analysis.suggestions.map(suggestion => `
+                                        <div class="alert alert-info alert-sm mb-2">
+                                            <strong>${suggestion.title}:</strong> ${suggestion.message}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultsContainer.innerHTML = html;
+        }
+
+        // Create error card HTML
+        function createErrorCard(error) {
+            const severityClass = `error-${error.severity || 'medium'}`;
+            const icon = {
+                'sentence_length': 'fas fa-text-width',
+                'passive_voice': 'fas fa-exchange-alt',
+                'conciseness': 'fas fa-compress-alt',
+                'clarity': 'fas fa-eye',
+                'readability': 'fas fa-book-open',
+                'grammar': 'fas fa-spell-check'
+            }[error.type] || 'fas fa-exclamation-triangle';
+
+            return `
+                <div class="card mb-2">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title mb-1">
+                                    <i class="${icon} me-2"></i>
+                                    ${error.type.replace('_', ' ').toUpperCase()}
+                                    <span class="badge ${severityClass} error-badge">${error.severity || 'medium'}</span>
+                                </h6>
+                                <p class="card-text mb-1">${error.message}</p>
+                                ${error.suggestions && error.suggestions.length > 0 ? `
+                                    <small class="text-muted">
+                                        <strong>Suggestions:</strong> ${error.suggestions.join(', ')}
+                                    </small>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Highlight errors in content
+        function highlightErrors(content, errors) {
+            let highlightedContent = content;
+            
+            errors.forEach(error => {
+                if (error.sentence) {
+                    const regex = new RegExp(escapeRegex(error.sentence), 'gi');
+                    highlightedContent = highlightedContent.replace(regex, 
+                        `<span class="error-highlight" title="${error.message}">${error.sentence}</span>`
+                    );
+                }
+            });
+            
+            return highlightedContent;
+        }
+
+        // Escape regex special characters
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        // AI Rewrite functionality
+        function rewriteContent() {
+            if (!currentContent || !currentAnalysis) {
+                alert('No content to rewrite');
+                return;
+            }
+
+            showLoading('rewrite-results', 'Generating AI rewrite...');
+
+            fetch('/rewrite', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: currentContent,
+                    errors: currentAnalysis.errors,
+                    context: 'paragraph'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayRewriteResults(data);
+                } else {
+                    showError('rewrite-results', data.error || 'Rewrite failed');
+                }
+            })
+            .catch(error => {
+                console.error('Rewrite error:', error);
+                showError('rewrite-results', 'Rewrite failed: ' + error.message);
+            });
+        }
+
+        // Display rewrite results
+        function displayRewriteResults(data) {
+            const resultsContainer = document.getElementById('rewrite-results');
+            
+            const html = `
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-magic me-2"></i>AI Rewrite Results
+                            <span class="badge bg-info ms-2">Confidence: ${(data.confidence * 100).toFixed(1)}%</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Original:</h6>
+                                <div class="border rounded p-3 bg-light mb-3">
+                                    ${data.original}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Rewritten:</h6>
+                                <div class="border rounded p-3 bg-success bg-opacity-10 mb-3">
+                                    ${data.rewritten_text || data.rewritten || 'No rewrite available'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${data.improvements && data.improvements.length > 0 ? `
+                        <div class="mt-3">
+                            <h6>Improvements Made:</h6>
+                            <ul class="list-group list-group-flush">
+                                ${data.improvements.map(improvement => `
+                                    <li class="list-group-item">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        ${improvement}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="text-center mt-3">
+                            <button class="btn btn-outline-primary me-2" onclick="copyToClipboard('${(data.rewritten_text || data.rewritten || '').replace(/'/g, "\\'")}')">
+                                <i class="fas fa-copy me-2"></i>Copy Rewritten Text
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="analyzeContent('${(data.rewritten_text || data.rewritten || '').replace(/'/g, "\\'")}')">
+                                <i class="fas fa-redo me-2"></i>Re-analyze
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultsContainer.innerHTML = html;
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show success message
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed top-0 end-0 p-3';
+                toast.style.zIndex = '9999';
+                toast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong class="me-auto">Success</strong>
+                        </div>
+                        <div class="toast-body">
+                            Text copied to clipboard!
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => document.body.removeChild(toast), 3000);
+            });
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 
