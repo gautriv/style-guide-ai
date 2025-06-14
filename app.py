@@ -3,11 +3,6 @@ Style Guide Application - Main Entry Point
 A modular Flask application for content analysis and AI-powered rewriting.
 """
 
-# Suppress warnings before any imports
-from suppress_warnings import suppress_warnings, configure_logging
-suppress_warnings()
-configure_logging()
-
 import os
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from flask_cors import CORS

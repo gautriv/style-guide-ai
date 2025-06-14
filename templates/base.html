@@ -350,144 +350,155 @@
                     </div>
                     
                     <div class="col-md-4">
-                        <div class="card statistics-card text-white">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Technical Writing Statistics</h5>
+                        <!-- Ultra-Modern Technical Writing Statistics Card -->
+                        <div class="card border-0 shadow-lg" style="border-radius: 24px; overflow: hidden; background: white;">
+                            <!-- Modern gradient header -->
+                            <div class="card-header border-0 pb-2" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%); color: white; border-radius: 0;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0 fw-bold">
+                                        <i class="fas fa-chart-line me-2"></i>Writing Analytics
+                                    </h5>
+                                    <button class="btn btn-sm btn-light btn-outline-light rounded-pill opacity-90" data-bs-toggle="modal" data-bs-target="#metricsHelpModal" style="border: 1px solid rgba(255,255,255,0.3);">
+                                        <i class="fas fa-question-circle"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <!-- Basic Counts -->
-                                <div class="row text-center mb-3">
-                                    <div class="col-4">
-                                        <h4>${analysis.statistics.word_count || 0}</h4>
-                                        <small>Words</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <h4>${analysis.statistics.sentence_count || 0}</h4>
-                                        <small>Sentences</small>
-                                    </div>
-                                    <div class="col-4">
-                                        <h4>${analysis.statistics.paragraph_count || 0}</h4>
-                                        <small>Paragraphs</small>
-                                    </div>
-                                </div>
+                            <div class="card-body pt-3" style="color: #2d3748; background: white;">
                                 
-                                <!-- Grade Level Assessment -->
-                                <div class="text-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.1);">
-                                    <h4 class="text-warning">
-                                        ${analysis.technical_writing_metrics?.estimated_grade_level?.toFixed(1) || 'N/A'}
-                                    </h4>
-                                    <small>Grade Level</small>
-                                    <br>
-                                    <small class="text-muted">
-                                        ${analysis.technical_writing_metrics?.grade_level_category || 'Unknown'}
-                                    </small>
-                                    ${analysis.technical_writing_metrics?.meets_target_grade ? 
-                                        '<br><i class="fas fa-check-circle text-success"></i> <small>Target Met</small>' : 
-                                        '<br><i class="fas fa-exclamation-circle text-warning"></i> <small>Outside Target (9-11)</small>'
-                                    }
-                                </div>
-                                
-                                <!-- Readability Scores -->
-                                <div class="mb-3">
-                                    <h6 class="text-center mb-2">Readability Scores</h6>
-                                    <div class="row text-center small">
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.flesch_reading_ease || 0).toFixed(1)}</strong>
-                                            <br><small>Flesch Reading Ease</small>
+                                <!-- Grade Level Assessment - Hero Section -->
+                                <div class="text-center mb-4 p-4 rounded-4" style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border: 2px solid #e2e8f0;">
+                                    <div class="d-flex justify-content-center align-items-center mb-3">
+                                        <div class="me-4">
+                                            <h1 class="mb-1 fw-bold" style="color: ${analysis.technical_writing_metrics?.meets_target_grade ? '#059669' : '#d97706'}; font-size: 2.5rem;">
+                                                ${analysis.technical_writing_metrics?.estimated_grade_level?.toFixed(1) || 'N/A'}
+                                            </h1>
+                                            <small class="text-muted fw-medium">Grade Level</small>
                                         </div>
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.flesch_kincaid_grade || 0).toFixed(1)}</strong>
-                                            <br><small>Flesch-Kincaid Grade</small>
-                                        </div>
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.gunning_fog_index || 0).toFixed(1)}</strong>
-                                            <br><small>Gunning Fog Index</small>
-                                        </div>
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.smog_index || 0).toFixed(1)}</strong>
-                                            <br><small>SMOG Index</small>
-                                        </div>
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.coleman_liau_index || 0).toFixed(1)}</strong>
-                                            <br><small>Coleman-Liau</small>
-                                        </div>
-                                        <div class="col-6 mb-2">
-                                            <strong>${(analysis.statistics.automated_readability_index || 0).toFixed(1)}</strong>
-                                            <br><small>ARI</small>
+                                        <div class="text-start">
+                                            <div class="badge fs-6 mb-2" style="background: ${analysis.technical_writing_metrics?.meets_target_grade ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #f59e0b, #d97706)'}; color: white; padding: 8px 16px;">
+                                                ${analysis.technical_writing_metrics?.grade_level_category || 'Unknown'}
+                                            </div>
+                                            <div class="small d-flex align-items-center">
+                                                ${analysis.technical_writing_metrics?.meets_target_grade ? 
+                                                    '<i class="fas fa-check-circle me-2" style="color: #059669;"></i><span style="color: #059669;">Perfect for technical docs</span>' : 
+                                                    '<i class="fas fa-exclamation-triangle me-2" style="color: #d97706;"></i><span style="color: #d97706;">Outside target (9-11th grade)</span>'
+                                                }
+                                            </div>
                                         </div>
                                     </div>
+                                    <div class="small text-muted p-3 rounded-3" style="background: white; border: 1px solid #e2e8f0;">
+                                        ${getGradeLevelInsight(analysis.technical_writing_metrics?.estimated_grade_level, analysis.technical_writing_metrics?.meets_target_grade)}
+                                    </div>
                                 </div>
-                                
-                                <!-- Overall Readability Rating -->
-                                <div class="text-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.1);">
-                                    <strong class="text-info">
-                                        ${analysis.technical_writing_metrics?.overall_readability_rating || 'Unknown'}
-                                    </strong>
-                                    <br><small>Overall Readability</small>
-                                </div>
-                                
-                                <!-- Technical Writing Metrics -->
-                                <div class="row text-center small mb-3">
+
+                                <!-- Document Overview - Clean Modern Cards -->
+                                <div class="row g-3 mb-4">
                                     <div class="col-4">
-                                        <strong>${(analysis.statistics.avg_sentence_length || 0).toFixed(1)}</strong>
-                                        <br><small>Avg Sentence Length</small>
+                                        <div class="text-center p-3 rounded-3" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
+                                            <h3 class="mb-1 fw-bold">${analysis.statistics.word_count || 0}</h3>
+                                            <small class="fw-medium">Words</small>
+                                        </div>
                                     </div>
                                     <div class="col-4">
-                                        <strong>${(analysis.statistics.avg_syllables_per_word || 0).toFixed(1)}</strong>
-                                        <br><small>Avg Syllables/Word</small>
+                                        <div class="text-center p-3 rounded-3" style="background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);">
+                                            <h3 class="mb-1 fw-bold">${analysis.statistics.sentence_count || 0}</h3>
+                                            <small class="fw-medium">Sentences</small>
+                                        </div>
                                     </div>
                                     <div class="col-4">
-                                        <strong>${(analysis.statistics.passive_voice_percentage || 0).toFixed(1)}%</strong>
-                                        <br><small>Passive Voice</small>
-                                    </div>
-                                </div>
-                                
-                                <!-- Complex Words -->
-                                <div class="row text-center small mb-3">
-                                    <div class="col-6">
-                                        <strong>${analysis.statistics.complex_words_count || 0}</strong>
-                                        <br><small>Complex Words</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <strong>${(analysis.statistics.complex_words_percentage || 0).toFixed(1)}%</strong>
-                                        <br><small>Complex Word %</small>
-                                    </div>
-                                </div>
-                                
-                                <!-- Technical Complexity Score -->
-                                <div class="text-center mb-3">
-                                    <div class="progress mb-2">
-                                        <div class="progress-bar ${(analysis.statistics.technical_complexity_score || 0) > 75 ? 'bg-danger' : 
-                                            (analysis.statistics.technical_complexity_score || 0) > 50 ? 'bg-warning' : 'bg-success'}" 
-                                            role="progressbar" 
-                                            style="width: ${Math.min(100, analysis.statistics.technical_complexity_score || 0)}%">
+                                        <div class="text-center p-3 rounded-3" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);">
+                                            <h3 class="mb-1 fw-bold">${Math.ceil((analysis.statistics.word_count || 0) / 250)}</h3>
+                                            <small class="fw-medium">Pages</small>
                                         </div>
                                     </div>
-                                    <small>Technical Complexity: ${(analysis.statistics.technical_complexity_score || 0).toFixed(1)}/100</small>
                                 </div>
-                                
-                                <!-- Recommendations -->
-                                ${analysis.technical_writing_metrics?.readability_recommendations?.length > 0 ? `
-                                <div class="mt-3">
-                                    <h6 class="text-center">Key Recommendations</h6>
-                                    <ul class="list-unstyled small">
-                                        ${analysis.technical_writing_metrics.readability_recommendations.slice(0, 3).map(rec => `
-                                            <li><i class="fas fa-arrow-right me-1"></i> ${rec}</li>
-                                        `).join('')}
-                                    </ul>
+
+                                <!-- Readability Scores - Light Modern Cards -->
+                                <div class="mb-4">
+                                    <h6 class="text-center mb-3 fw-semibold d-flex align-items-center justify-content-center" style="color: #374151;">
+                                        <i class="fas fa-tachometer-alt me-2" style="color: #6366f1;"></i>Readability Metrics
+                                    </h6>
+                                    <div class="row g-2">
+                                        ${generateModernReadabilityCard('Flesch Score', analysis.statistics.flesch_reading_ease, 'Higher = easier to read', 'fas fa-book-open', getFleschColor(analysis.statistics.flesch_reading_ease))}
+                                        ${generateModernReadabilityCard('Fog Index', analysis.statistics.gunning_fog_index, 'Education years needed', 'fas fa-graduation-cap', getFogColor(analysis.statistics.gunning_fog_index))}
+                                        ${generateModernReadabilityCard('SMOG Grade', analysis.statistics.smog_index, 'School grade level', 'fas fa-school', getGradeColor(analysis.statistics.smog_index))}
+                                        ${generateModernReadabilityCard('ARI Score', analysis.statistics.automated_readability_index, 'Age to understand', 'fas fa-user-graduate', getGradeColor(analysis.statistics.automated_readability_index))}
+                                    </div>
                                 </div>
-                                ` : ''}
-                                
-                                ${analysis.suggestions.length > 0 ? `
-                                <div class="mt-3">
-                                    <h6>General Suggestions:</h6>
-                                    ${analysis.suggestions.map(suggestion => `
-                                        <div class="alert alert-info alert-sm mb-2">
-                                            <strong>${suggestion.title}:</strong> ${suggestion.message}
+
+                                <!-- Writing Quality - Light Background Progress Bars -->
+                                <div class="mb-4">
+                                    <h6 class="text-center mb-3 fw-semibold d-flex align-items-center justify-content-center" style="color: #374151;">
+                                        <i class="fas fa-clipboard-check me-2" style="color: #059669;"></i>Writing Quality
+                                    </h6>
+                                    
+                                    <!-- Modern Passive Voice Indicator -->
+                                    <div class="mb-3 p-3 rounded-3" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.1);">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-exchange-alt me-2" style="color: #3b82f6;"></i>
+                                                <span class="fw-medium" style="color: #1f2937;">Passive Voice</span>
+                                                <span class="badge bg-light text-dark ms-2 rounded-pill" data-bs-toggle="tooltip" title="Keep under 15% for active writing" style="font-size: 0.7rem;">?</span>
+                                            </div>
+                                            <span class="fw-bold" style="color: #1f2937;">${(analysis.statistics.passive_voice_percentage || 0).toFixed(1)}%</span>
                                         </div>
-                                    `).join('')}
+                                        <div class="progress mb-2" style="height: 8px; background: rgba(59, 130, 246, 0.1); border-radius: 10px;">
+                                            <div class="progress-bar" 
+                                                 style="width: ${Math.min(100, (analysis.statistics.passive_voice_percentage || 0) * 6.67)}%; border-radius: 10px; background: ${getModernPassiveVoiceGradient(analysis.statistics.passive_voice_percentage)};"></div>
+                                        </div>
+                                        <div class="small" style="color: #6b7280;">
+                                            ${getPassiveVoiceInsight(analysis.statistics.passive_voice_percentage)}
+                                        </div>
+                                    </div>
+
+                                    <!-- Modern Sentence Length Indicator -->
+                                    <div class="mb-3 p-3 rounded-3" style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.1);">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-text-width me-2" style="color: #06b6d4;"></i>
+                                                <span class="fw-medium" style="color: #1f2937;">Sentence Length</span>
+                                                <span class="badge bg-light text-dark ms-2 rounded-pill" data-bs-toggle="tooltip" title="Aim for 15-20 words per sentence" style="font-size: 0.7rem;">?</span>
+                                            </div>
+                                            <span class="fw-bold" style="color: #1f2937;">${(analysis.statistics.avg_sentence_length || 0).toFixed(1)} words</span>
+                                        </div>
+                                        <div class="progress mb-2" style="height: 8px; background: rgba(6, 182, 212, 0.1); border-radius: 10px;">
+                                            <div class="progress-bar" 
+                                                 style="width: ${Math.min(100, (analysis.statistics.avg_sentence_length || 0) * 2.5)}%; border-radius: 10px; background: ${getModernSentenceLengthGradient(analysis.statistics.avg_sentence_length)};"></div>
+                                        </div>
+                                        <div class="small" style="color: #6b7280;">
+                                            ${getSentenceLengthInsight(analysis.statistics.avg_sentence_length)}
+                                        </div>
+                                    </div>
+
+                                    <!-- Modern Word Complexity Indicator -->
+                                    <div class="mb-3 p-3 rounded-3" style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.1);">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-brain me-2" style="color: #8b5cf6;"></i>
+                                                <span class="fw-medium" style="color: #1f2937;">Complex Words</span>
+                                                <span class="badge bg-light text-dark ms-2 rounded-pill" data-bs-toggle="tooltip" title="Words with 3+ syllables" style="font-size: 0.7rem;">?</span>
+                                            </div>
+                                            <span class="fw-bold" style="color: #1f2937;">${(analysis.statistics.complex_words_percentage || 0).toFixed(1)}%</span>
+                                        </div>
+                                        <div class="progress mb-2" style="height: 8px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                                            <div class="progress-bar" 
+                                                 style="width: ${Math.min(100, (analysis.statistics.complex_words_percentage || 0) * 3.33)}%; border-radius: 10px; background: ${getModernComplexWordsGradient(analysis.statistics.complex_words_percentage)};"></div>
+                                        </div>
+                                        <div class="small" style="color: #6b7280;">
+                                            ${getComplexWordsInsight(analysis.statistics.complex_words_percentage)}
+                                        </div>
+                                    </div>
                                 </div>
-                                ` : ''}
+
+                                <!-- Smart Recommendations - Clean Modern Design -->
+                                <div class="mt-4">
+                                    <h6 class="text-center mb-3 fw-semibold d-flex align-items-center justify-content-center" style="color: #374151;">
+                                        <i class="fas fa-lightbulb me-2" style="color: #f59e0b;"></i>Smart Recommendations
+                                    </h6>
+                                    <div class="smart-recommendations">
+                                        ${generateModernSmartRecommendations(analysis)}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -666,7 +677,230 @@
                 setTimeout(() => document.body.removeChild(toast), 3000);
             });
         }
+
+        // Modern helper functions with better, lighter color schemes
+        function generateModernReadabilityCard(title, value, description, icon, colorClass) {
+            const bgGradient = getReadabilityCardGradient(colorClass);
+            return `
+                <div class="col-6 mb-2">
+                    <div class="text-center p-3 rounded-3" style="background: ${bgGradient}; border: 1px solid rgba(255,255,255,0.2); color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div class="d-flex align-items-center justify-content-center mb-1">
+                            <i class="${icon} me-2"></i>
+                            <strong>${(value || 0).toFixed(1)}</strong>
+                        </div>
+                        <div class="small fw-medium" style="font-size: 0.75rem; line-height: 1.2;">
+                            ${title}
+                        </div>
+                        <div class="small opacity-75" style="font-size: 0.65rem;">
+                            ${description}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getReadabilityCardGradient(colorClass) {
+            if (colorClass.includes('success')) return 'linear-gradient(135deg, #10b981, #059669)';
+            if (colorClass.includes('warning')) return 'linear-gradient(135deg, #f59e0b, #d97706)';
+            return 'linear-gradient(135deg, #ef4444, #dc2626)';
+        }
+
+        function getModernPassiveVoiceGradient(percentage) {
+            if (percentage <= 10) return 'linear-gradient(90deg, #10b981, #059669)';
+            if (percentage <= 15) return 'linear-gradient(90deg, #f59e0b, #d97706)';
+            return 'linear-gradient(90deg, #ef4444, #dc2626)';
+        }
+
+        function getModernSentenceLengthGradient(length) {
+            if (length >= 15 && length <= 20) return 'linear-gradient(90deg, #10b981, #059669)';
+            if (length <= 25) return 'linear-gradient(90deg, #f59e0b, #d97706)';
+            return 'linear-gradient(90deg, #ef4444, #dc2626)';
+        }
+
+        function getModernComplexWordsGradient(percentage) {
+            if (percentage <= 15) return 'linear-gradient(90deg, #10b981, #059669)';
+            if (percentage <= 25) return 'linear-gradient(90deg, #f59e0b, #d97706)';
+            return 'linear-gradient(90deg, #ef4444, #dc2626)';
+        }
+
+        function generateModernSmartRecommendations(analysis) {
+            const recommendations = [];
+            const stats = analysis.statistics;
+            
+            // Grade level recommendations
+            if (analysis.technical_writing_metrics?.estimated_grade_level > 12) {
+                recommendations.push({
+                    icon: 'fas fa-arrow-down',
+                    text: 'Simplify sentences to lower grade level',
+                    priority: 'high',
+                    color: '#ef4444'
+                });
+            }
+            
+            // Passive voice recommendations
+            if (stats.passive_voice_percentage > 15) {
+                recommendations.push({
+                    icon: 'fas fa-exchange-alt',
+                    text: 'Reduce passive voice usage',
+                    priority: 'medium',
+                    color: '#f59e0b'
+                });
+            }
+            
+            // Sentence length recommendations
+            if (stats.avg_sentence_length > 25) {
+                recommendations.push({
+                    icon: 'fas fa-cut',
+                    text: 'Break up long sentences',
+                    priority: 'high',
+                    color: '#ef4444'
+                });
+            }
+            
+            // Complex words recommendations
+            if (stats.complex_words_percentage > 20) {
+                recommendations.push({
+                    icon: 'fas fa-lightbulb',
+                    text: 'Replace complex words with simpler alternatives',
+                    priority: 'medium',
+                    color: '#f59e0b'
+                });
+            }
+            
+            // Positive reinforcement
+            if (recommendations.length === 0) {
+                recommendations.push({
+                    icon: 'fas fa-check-circle',
+                    text: 'Excellent writing quality!',
+                    priority: 'positive',
+                    color: '#10b981'
+                });
+            }
+            
+            // Limit to top 3 recommendations
+            return recommendations.slice(0, 3).map(rec => `
+                <div class="d-flex align-items-center mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.9); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div class="me-3 d-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: linear-gradient(135deg, ${rec.color}20, ${rec.color}30); border: 1px solid ${rec.color}40;">
+                        <i class="${rec.icon}" style="color: ${rec.color}; font-size: 0.9rem;"></i>
+                    </div>
+                    <span class="fw-medium" style="color: #374151; font-size: 0.9rem;">${rec.text}</span>
+                </div>
+            `).join('');
+        }
+
+        // Initialize tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+
+        // Essential insight functions that were missing
+        function getGradeLevelInsight(gradeLevel, meetsTarget) {
+            if (!gradeLevel) return "Unable to calculate grade level";
+            if (meetsTarget) return "Perfect for technical documentation readers";
+            if (gradeLevel < 9) return "May be too simple for technical audience";
+            if (gradeLevel > 15) return "Consider simplifying for broader accessibility";
+            return "Slightly outside optimal range for technical docs";
+        }
+
+        function getPassiveVoiceInsight(percentage) {
+            if (percentage <= 5) return "Excellent - very active writing";
+            if (percentage <= 10) return "Good - mostly active voice";
+            if (percentage <= 15) return "Acceptable - within recommended range";
+            return "Consider converting to active voice";
+        }
+
+        function getSentenceLengthInsight(length) {
+            if (length <= 15) return "Great - concise and clear";
+            if (length <= 20) return "Perfect - optimal readability";
+            if (length <= 25) return "Good - still readable";
+            return "Consider breaking into shorter sentences";
+        }
+
+        function getComplexWordsInsight(percentage) {
+            if (percentage <= 10) return "Excellent - very accessible";
+            if (percentage <= 15) return "Good - appropriate complexity";
+            if (percentage <= 20) return "Acceptable for technical content";
+            return "Consider simpler alternatives";
+        }
+
+        // Essential color helper functions that were missing
+        function getFleschColor(score) {
+            if (score >= 60) return 'text-success';
+            if (score >= 30) return 'text-warning';
+            return 'text-danger';
+        }
+
+        function getFogColor(score) {
+            if (score <= 12) return 'text-success';
+            if (score <= 16) return 'text-warning';
+            return 'text-danger';
+        }
+
+        function getGradeColor(score) {
+            if (score >= 9 && score <= 11) return 'text-success';
+            if (score >= 8 && score <= 13) return 'text-warning';
+            return 'text-danger';
+        }
+
+        function getPassiveVoiceColor(percentage) {
+            if (percentage <= 10) return 'bg-success';
+            if (percentage <= 15) return 'bg-warning';
+            return 'bg-danger';
+        }
+
+        function getSentenceLengthColor(length) {
+            if (length >= 15 && length <= 20) return 'bg-success';
+            if (length <= 25) return 'bg-warning';
+            return 'bg-danger';
+        }
+
+        function getComplexWordsColor(percentage) {
+            if (percentage <= 15) return 'bg-success';
+            if (percentage <= 25) return 'bg-warning';
+            return 'bg-danger';
+        }
     </script>
+
+    <!-- Help Modal for Metrics Explanation -->
+    <div class="modal fade" id="metricsHelpModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>Understanding Writing Metrics
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-graduation-cap me-2 text-primary"></i>Grade Level</h6>
+                            <p class="small text-muted">Indicates the school grade level needed to understand your text. For technical documentation, aim for 9-11th grade.</p>
+                            
+                            <h6><i class="fas fa-book-open me-2 text-success"></i>Flesch Reading Ease</h6>
+                            <p class="small text-muted">Scale of 0-100. Higher scores mean easier to read. 60+ is good for technical content.</p>
+                            
+                            <h6><i class="fas fa-tachometer-alt me-2 text-warning"></i>Gunning Fog Index</h6>
+                            <p class="small text-muted">Years of formal education needed to understand text. Below 12 is recommended.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-exchange-alt me-2 text-info"></i>Passive Voice</h6>
+                            <p class="small text-muted">Percentage of sentences using passive voice. Keep under 15% for active, engaging writing.</p>
+                            
+                            <h6><i class="fas fa-text-width me-2 text-secondary"></i>Sentence Length</h6>
+                            <p class="small text-muted">Average words per sentence. Aim for 15-20 words for optimal readability.</p>
+                            
+                            <h6><i class="fas fa-brain me-2 text-dark"></i>Complex Words</h6>
+                            <p class="small text-muted">Words with 3+ syllables. Lower percentages improve accessibility.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {% block extra_js %}{% endblock %}
 </body>
