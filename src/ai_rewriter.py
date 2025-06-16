@@ -406,17 +406,34 @@ FINAL POLISHED VERSION:"""
         
         if sentence_suggestions:
             suggestions_text = "\n".join(f"- {suggestion}" for suggestion in sentence_suggestions)
-            prompt = f"""Apply these specific improvements:
+            prompt = f"""You are a professional technical writing editor. Rewrite the following text to address these specific issues:
 
 {suggestions_text}
+
+REWRITING GUIDELINES:
+- Convert all passive voice to active voice
+- Use simple, direct language instead of corporate jargon
+- Break long sentences into shorter, clearer ones (15-20 words each)
+- Remove unnecessary words and phrases
+- Maintain the original meaning and all key information
+- Write for a 9th-11th grade reading level
 
 Original text:
 {content}
 
 Improved text:"""
         else:
-            prompt = f"""Improve this text:
+            prompt = f"""You are a professional technical writing editor. Improve this text for clarity and conciseness:
 
+REWRITING GUIDELINES:
+- Use active voice throughout
+- Choose simple, direct words over complex ones
+- Keep sentences short and clear (15-20 words each)
+- Remove unnecessary words and corporate jargon
+- Maintain all original meaning and information
+- Write for a 9th-11th grade reading level
+
+Original text:
 {content}
 
 Improved text:"""
@@ -442,9 +459,9 @@ Improved text:"""
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.1,  # Very low temperature for focused output
-                    "top_p": 0.5,
-                    "top_k": 10,        # Very focused vocabulary
+                    "temperature": 0.4,  # Increased from 0.1 for more creative rewrites
+                    "top_p": 0.7,        # Increased from 0.5 for more variety
+                    "top_k": 20,         # Increased from 10 for more vocabulary options
                     "num_predict": 512,  # Increased from 100 to allow full text completion
                     "stop": ["\n\nOriginal:", "\n\nRewrite:", "###", "---"]  # Clear stop tokens
                 }
@@ -563,115 +580,100 @@ Improved text:"""
         cleaned = generated_text.strip()
         logger.info(f"Raw AI response: '{cleaned[:200]}...'")
         
-        # Extract the actual rewrite from common AI response patterns
+        # Remove meta-commentary and explanations more aggressively
         
-        # Pattern 1: "Here is the improved text: [content]"
-        if "here is the improved text:" in cleaned.lower():
-            parts = cleaned.split(":")
-            if len(parts) > 1:
-                # Take everything after the first colon
-                potential_rewrite = ":".join(parts[1:]).strip()
-                # Remove any explanations that come after
-                if "I applied" in potential_rewrite or "I made" in potential_rewrite:
-                    potential_rewrite = potential_rewrite.split("I applied")[0].split("I made")[0].strip()
-                if potential_rewrite:
-                    cleaned = potential_rewrite
+        # Split into paragraphs and find the actual content
+        paragraphs = cleaned.split('\n\n')
+        content_paragraphs = []
         
-        # Pattern 2: "Improved text: [content]" or "Rewritten text: [content]"
-        elif any(marker in cleaned.lower() for marker in ["improved text:", "rewritten text:", "revised text:"]):
-            for marker in ["improved text:", "rewritten text:", "revised text:"]:
-                if marker in cleaned.lower():
-                    parts = cleaned.lower().split(marker)
-                    if len(parts) > 1:
-                        # Find the position in original case text
-                        marker_pos = cleaned.lower().find(marker)
-                        potential_rewrite = cleaned[marker_pos + len(marker):].strip()
-                        if "I applied" in potential_rewrite or "I made" in potential_rewrite:
-                            potential_rewrite = potential_rewrite.split("I applied")[0].split("I made")[0].strip()
-                        if potential_rewrite:
-                            cleaned = potential_rewrite
-                        break
-        
-        # Remove meta-commentary that starts sentences
-        if cleaned.lower().startswith(("sure", "here's", "i'll", "let me", "i can", "i will", "here is")):
-            lines = cleaned.split('\n')
-            for i, line in enumerate(lines):
-                line_clean = line.strip()
-                # Look for the first line that looks like actual content (not meta-commentary)
-                if (len(line_clean) > 20 and 
-                    not line_clean.lower().startswith(("sure", "here", "let me", "i'll", "i can", "i will", "i applied", "i made")) and
-                    not line_clean.startswith(("1.", "2.", "3.", "*", "-"))):
-                    cleaned = '\n'.join(lines[i:])
-                    break
-        
-        # Remove numbered explanations and bullet points
-        lines = cleaned.split('\n')
-        content_lines = []
-        explanation_started = False
-        
-        for line in lines:
-            line_stripped = line.strip()
-            
-            # Skip empty lines
-            if not line_stripped:
-                if content_lines:  # Only add empty lines between content
-                    content_lines.append('')
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
                 continue
             
-            # Check if this line starts an explanation section
-            if (line_stripped.lower().startswith(("i applied", "i made", "the following changes", "here are the improvements")) or
-                line_stripped.startswith(("1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")) or
-                line_stripped.startswith(("* ", "- ")) or
-                "improvements:" in line_stripped.lower() or
-                "changes made:" in line_stripped.lower()):
-                explanation_started = True
+            # Skip paragraphs that are clearly meta-commentary
+            meta_indicators = [
+                'note:', 'i\'ve rewritten', 'i have rewritten', 'i applied', 'i made',
+                'the following changes', 'here are the improvements', 'improvements made:',
+                'changes made:', 'key improvements:', 'i converted', 'i removed',
+                'i shortened', 'i replaced', 'the rewrite', 'this rewrite',
+                'to address the issues', 'as requested', 'per your instructions'
+            ]
+            
+            # Check if paragraph starts with meta-commentary
+            para_lower = para.lower()
+            is_meta = any(para_lower.startswith(indicator) for indicator in meta_indicators)
+            
+            # Also check if paragraph contains explanation patterns
+            explanation_patterns = [
+                'i\'ve', 'i have', 'i applied', 'i made', 'i converted', 'i removed',
+                'to address', 'as you specified', 'per the guidelines', 'following the instructions'
+            ]
+            
+            has_explanation = any(pattern in para_lower for pattern in explanation_patterns)
+            
+            # Skip if it's clearly meta-commentary
+            if is_meta or (has_explanation and len(para.split()) < 50):
+                logger.info(f"Skipping meta-commentary paragraph: '{para[:100]}...'")
                 continue
             
-            # If we've started explanations, skip everything
-            if explanation_started:
-                continue
-            
-            # Add content lines
-            content_lines.append(line)
+            content_paragraphs.append(para)
         
-        cleaned = '\n'.join(content_lines).strip()
+        # Rejoin content paragraphs
+        if content_paragraphs:
+            cleaned = '\n\n'.join(content_paragraphs)
         
-        # Remove common AI response artifacts
-        artifacts_to_remove = [
-            "Here is the improved text:",
-            "Here's the improved text:",
-            "Improved text:",
-            "Rewritten text:",
-            "Revised text:",
-            "The improved version:",
-            "Here is the rewrite:",
-            "Here's the rewrite:"
+        # Remove common AI response prefixes
+        prefixes_to_remove = [
+            "here is the improved text:",
+            "here's the improved text:",
+            "improved text:",
+            "rewritten text:",
+            "revised text:",
+            "the improved version:",
+            "here is the rewrite:",
+            "here's the rewrite:",
+            "sure, here's",
+            "certainly, here's",
+            "here's a rewritten version:"
         ]
         
-        for artifact in artifacts_to_remove:
-            if cleaned.startswith(artifact):
-                cleaned = cleaned[len(artifact):].strip()
+        for prefix in prefixes_to_remove:
+            if cleaned.lower().startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                break
         
-        # Remove trailing explanations
-        stop_phrases = [
-            "I applied all the specified improvements",
-            "I made the following changes",
-            "The following changes were made",
-            "Here are the improvements",
-            "Key improvements include",
-            "Changes made:",
-            "Improvements:"
-        ]
+        # Remove sentences that are clearly explanatory
+        sentences = re.split(r'(?<=[.!?])\s+', cleaned)
+        content_sentences = []
         
-        for phrase in stop_phrases:
-            if phrase in cleaned:
-                cleaned = cleaned.split(phrase)[0].strip()
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            
+            sentence_lower = sentence.lower()
+            
+            # Skip explanatory sentences
+            explanatory_starts = [
+                'note:', 'i\'ve', 'i have', 'i applied', 'i made', 'i converted',
+                'i removed', 'i shortened', 'i replaced', 'this addresses',
+                'these changes', 'the rewrite', 'as requested', 'per your'
+            ]
+            
+            is_explanatory = any(sentence_lower.startswith(start) for start in explanatory_starts)
+            
+            if not is_explanatory:
+                content_sentences.append(sentence)
         
-        # Clean up any remaining artifacts
-        cleaned = re.sub(r'\n\s*\*\s*.*$', '', cleaned, flags=re.MULTILINE | re.DOTALL)  # Remove bullet points at end
-        cleaned = re.sub(r'\n\s*\d+\.\s*.*$', '', cleaned, flags=re.MULTILINE | re.DOTALL)  # Remove numbered lists at end
+        if content_sentences:
+            cleaned = ' '.join(content_sentences)
         
+        # Remove any remaining artifacts
+        cleaned = re.sub(r'\[insert[^\]]*\]', '', cleaned)  # Remove placeholder text like [insert specific examples]
+        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
         cleaned = cleaned.strip()
+        
         logger.info(f"Cleaned AI response: '{cleaned[:200]}...'")
         
         # Validation
@@ -684,7 +686,7 @@ Improved text:"""
             logger.warning("Generated text identical to original after cleaning")
             return original_text
         
-        # Final cleanup - ensure proper sentence endings
+        # Ensure proper sentence endings
         if cleaned and not cleaned.endswith(('.', '!', '?')):
             # Find the last complete sentence
             sentences = re.split(r'[.!?]+', cleaned)
