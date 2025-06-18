@@ -1574,6 +1574,90 @@ class ConcisenessRule(BaseRule):
         
         return False
     
+    def _analyze_temporal_filler(self, token, doc) -> Dict[str, Any]:
+        """Analyze temporal filler phrase using SpaCy analysis."""
+        analysis = {
+            'type': 'temporal_filler',
+            'token': token,
+            'simplification_potential': 0.0,
+            'redundancy_type': 'unknown',
+            'position': token.idx
+        }
+        
+        # Analyze the temporal pattern
+        if token.dep_ == "advmod" and token.pos_ == "ADV":
+            temporal_pattern = self._analyze_temporal_pattern(token, doc)
+            if temporal_pattern['is_filler']:
+                analysis['simplification_potential'] = temporal_pattern['simplification_potential']
+                analysis['redundancy_type'] = temporal_pattern['pattern_type']
+                return analysis
+        
+        # Check for participial temporal constructions
+        elif token.pos_ == "VERB" and "Tense=Past" in str(token.morph):
+            if self._is_participial_filler(token, doc):
+                analysis['redundancy_type'] = 'participial_temporal'
+                analysis['simplification_potential'] = 0.7
+                return analysis
+        
+        return None
+    
+    def _analyze_purpose_filler(self, token, doc) -> Dict[str, Any]:
+        """Analyze purpose filler phrase using SpaCy analysis."""
+        analysis = {
+            'type': 'purpose_filler',
+            'token': token,
+            'redundancy_type': 'unknown',
+            'position': token.idx
+        }
+        
+        # Analyze purpose clause redundancy
+        if token.dep_ == "advcl" and token.pos_ == "VERB":
+            if "VerbForm=Inf" in str(token.morph):
+                purpose_content = self._analyze_purpose_content(token, doc)
+                if purpose_content['is_redundant']:
+                    analysis['redundancy_type'] = purpose_content['redundancy_type']
+                    analysis['semantic_value'] = purpose_content['semantic_value']
+                    return analysis
+        
+        # Analyze prepositional purpose phrases
+        elif token.dep_ == "prep" and self._is_purpose_preposition(token):
+            if self._is_redundant_prepositional_purpose(token, doc):
+                analysis['redundancy_type'] = 'redundant_prep_purpose'
+                return analysis
+        
+        return None
+    
+    def _analyze_discourse_filler(self, token, doc) -> Dict[str, Any]:
+        """Analyze discourse marker filler using SpaCy analysis."""
+        analysis = {
+            'type': 'discourse_filler',
+            'token': token,
+            'redundancy_type': 'discourse_marker',
+            'position': token.idx
+        }
+        
+        # Check if this is indeed a discourse filler
+        if token.dep_ == "advmod" and token.pos_ == "ADV":
+            if self._is_discourse_marker_adverb(token):
+                return analysis
+        
+        return None
+    
+    def _is_redundant_purpose_clause(self, token, doc) -> bool:
+        """Check if purpose clause is redundant using SpaCy analysis."""
+        # Analyze the purpose content
+        purpose_analysis = self._analyze_purpose_content(token, doc)
+        return purpose_analysis.get('is_redundant', False)
+    
+    def _is_redundant_prepositional_purpose(self, token, doc) -> bool:
+        """Check if prepositional purpose phrase is redundant."""
+        # Look at the object of the preposition
+        for child in token.children:
+            if child.dep_ == "pobj":
+                if self._is_vague_purpose_object(child, doc):
+                    return True
+        return False
+    
     def _generate_conciseness_suggestions_from_linguistics(self, issue: Dict[str, Any], doc=None) -> List[str]:
         """Generate suggestions based on linguistic analysis."""
         suggestions = []
