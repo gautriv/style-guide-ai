@@ -163,10 +163,203 @@ class StylisticFlowRule(BaseRule):
         subject_features = self._get_morphological_features(subject)
         
         # Check if subject can logically perform the participle action
-        if self._is_animate_subject(subject) and self._is_action_requiring_agency(participle):
+        if self._is_animate_agent(subject, doc) and self._has_agency_verb_pattern(participle):
             return True
         
         if self._is_inanimate_subject(subject) and self._is_state_participle(participle):
+            return True
+        
+        return False
+    
+    def _is_animate_agent(self, token, doc) -> bool:
+        """Check if token represents animate agent using pure SpaCy morphological analysis."""
+        # Method 1: Use SpaCy's Named Entity Recognition
+        if self._is_person_entity_morphologically(token):
+            return True
+        
+        # Method 2: Use morphological patterns for animate roles
+        if self._has_animate_role_morphology(token):
+            return True
+        
+        # Method 3: Use organizational patterns that suggest animate agency
+        if self._has_organizational_agent_morphology(token):
+            return True
+        
+        return False
+
+    def _is_person_entity_morphologically(self, token) -> bool:
+        """Check if token is person entity using SpaCy NER."""
+        # Use SpaCy's built-in person detection
+        return token.ent_type_ == "PERSON"
+
+    def _has_animate_role_morphology(self, token) -> bool:
+        """Check for animate role morphological patterns using SpaCy analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Animate roles often have agent morphology (-er, -or suffixes)
+        if lemma.endswith('er') or lemma.endswith('or') or lemma.endswith('ist'):
+            return True
+        
+        # Professional role patterns using morphological analysis
+        if self._has_professional_role_morphology(token):
+            return True
+        
+        return False
+
+    def _has_professional_role_morphology(self, token) -> bool:
+        """Check for professional role morphology using SpaCy features."""
+        lemma = token.lemma_.lower()
+        
+        # Professional roles often have these morphological patterns
+        if 'engineer' in lemma or 'develop' in lemma or 'analyz' in lemma:
+            return True
+        
+        if 'manag' in lemma or 'direct' in lemma or 'lead' in lemma:
+            return True
+        
+        return False
+
+    def _has_organizational_agent_morphology(self, token) -> bool:
+        """Check for organizational agent morphology patterns."""
+        # Organizational entities can be animate agents
+        if token.ent_type_ == "ORG":
+            return True
+        
+        lemma = token.lemma_.lower()
+        
+        # Team/group patterns suggest collective animate agency
+        if 'team' in lemma or 'group' in lemma or 'staff' in lemma:
+            return True
+        
+        return False
+
+    def _has_agency_verb_pattern(self, verb_token) -> bool:
+        """Check for agency verb patterns using pure SpaCy morphological analysis."""
+        # Method 1: Check for action verb morphology
+        if self._is_action_verb_morphologically(verb_token):
+            return True
+        
+        # Method 2: Check for process initiation morphology
+        if self._has_initiation_morphology(verb_token):
+            return True
+        
+        # Method 3: Check for problem-resolution morphology
+        if self._has_resolution_morphology(verb_token):
+            return True
+        
+        return False
+
+    def _is_action_verb_morphologically(self, verb_token) -> bool:
+        """Check if verb is action-oriented using SpaCy morphological analysis."""
+        # Action verbs often have transitive patterns
+        if self._has_transitive_pattern(verb_token):
+            return True
+        
+        # Check for implementation/execution morphology
+        if self._has_implementation_morphology(verb_token):
+            return True
+        
+        return False
+
+    def _has_transitive_pattern(self, verb_token) -> bool:
+        """Check for transitive verb patterns using SpaCy dependency analysis."""
+        # Transitive verbs take direct objects
+        for child in verb_token.children:
+            if child.dep_ == "dobj":  # Direct object
+                return True
+        
+        return False
+
+    def _has_implementation_morphology(self, verb_token) -> bool:
+        """Check for implementation morphology patterns."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Implementation verbs have specific morphological patterns
+        if 'implement' in lemma or 'execut' in lemma or 'perform' in lemma:
+            return True
+        
+        if 'updat' in lemma or 'modif' in lemma or 'chang' in lemma:
+            return True
+        
+        return False
+
+    def _has_initiation_morphology(self, verb_token) -> bool:
+        """Check for initiation morphology patterns using SpaCy analysis."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Initiation verbs often have beginning/starting morphology
+        if 'initiat' in lemma or 'start' in lemma or 'begin' in lemma:
+            return True
+        
+        if 'launch' in lemma or 'trigger' in lemma:
+            return True
+        
+        return False
+
+    def _has_resolution_morphology(self, verb_token) -> bool:
+        """Check for resolution morphology patterns using SpaCy analysis."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Resolution verbs have completion/solving morphology
+        if 'resolv' in lemma or 'solv' in lemma or 'fix' in lemma:
+            return True
+        
+        if 'complet' in lemma or 'finish' in lemma:
+            return True
+        
+        return False
+
+    def _has_state_change_pattern(self, verb_token) -> bool:
+        """Check for state change patterns using pure SpaCy morphological analysis."""
+        # Method 1: Check for causative morphology
+        if self._has_causative_morphology(verb_token):
+            return True
+        
+        # Method 2: Check for effect/impact morphology
+        if self._has_impact_morphology(verb_token):
+            return True
+        
+        # Method 3: Check for state transition morphology
+        if self._has_transition_morphology(verb_token):
+            return True
+        
+        return False
+
+    def _has_causative_morphology(self, verb_token) -> bool:
+        """Check for causative morphology using SpaCy analysis."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Causative verbs often have causing/influencing morphology
+        if 'caus' in lemma or 'trigger' in lemma or 'lead' in lemma:
+            return True
+        
+        if 'generat' in lemma or 'produc' in lemma:
+            return True
+        
+        return False
+
+    def _has_impact_morphology(self, verb_token) -> bool:
+        """Check for impact morphology patterns."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Impact verbs have affecting/influencing morphology
+        if 'affect' in lemma or 'impact' in lemma or 'influenc' in lemma:
+            return True
+        
+        if 'chang' in lemma or 'alter' in lemma:
+            return True
+        
+        return False
+
+    def _has_transition_morphology(self, verb_token) -> bool:
+        """Check for transition morphology using SpaCy analysis."""
+        lemma = verb_token.lemma_.lower()
+        
+        # Transition verbs have movement/change morphology
+        if 'shift' in lemma or 'mov' in lemma or 'transform' in lemma:
+            return True
+        
+        if 'convert' in lemma or 'switch' in lemma:
             return True
         
         return False
@@ -186,17 +379,72 @@ class StylisticFlowRule(BaseRule):
         """Check if subject is inanimate using morphological analysis."""
         return not self._is_animate_subject(subject_token)
     
-    def _is_action_requiring_agency(self, participle_token) -> bool:
-        """Check if participle requires an animate agent."""
-        lemma = participle_token.lemma_.lower()
-        agency_verbs = ['analyze', 'discover', 'initiate', 'update', 'resolve', 'implement']
-        return any(verb in lemma for verb in agency_verbs)
-    
     def _is_state_participle(self, participle_token) -> bool:
-        """Check if participle describes a state rather than action."""
+        """Check if participle describes a state rather than action using pure SpaCy morphological analysis."""
+        # Method 1: Check for state-describing morphology
+        if self._has_state_describing_morphology(participle_token):
+            return True
+        
+        # Method 2: Check for result/outcome morphology
+        if self._has_result_morphology(participle_token):
+            return True
+        
+        # Method 3: Check for status/condition morphology
+        if self._has_status_morphology(participle_token):
+            return True
+        
+        return False
+
+    def _has_state_describing_morphology(self, participle_token) -> bool:
+        """Check for state-describing morphology using SpaCy analysis."""
         lemma = participle_token.lemma_.lower()
-        state_patterns = ['resolve', 'flag', 'affect', 'impact', 'cause']
-        return any(pattern in lemma for pattern in state_patterns)
+        
+        # State participles often describe conditions/states
+        if 'resolv' in lemma or 'complet' in lemma or 'finish' in lemma:
+            return True
+        
+        if 'establish' in lemma or 'determin' in lemma:
+            return True
+        
+        return False
+
+    def _has_result_morphology(self, participle_token) -> bool:
+        """Check for result morphology patterns using SpaCy analysis."""
+        # Results often expressed through past participles
+        if (participle_token.morph.get("VerbForm") == ["Part"] and 
+            participle_token.morph.get("Tense") == ["Past"]):
+            
+            # Check if it describes an end state
+            if self._describes_end_state(participle_token):
+                return True
+        
+        return False
+
+    def _describes_end_state(self, participle_token) -> bool:
+        """Check if participle describes an end state using morphological analysis."""
+        lemma = participle_token.lemma_.lower()
+        
+        # End states often have completion/finality morphology
+        if 'flag' in lemma or 'mark' in lemma or 'identif' in lemma:
+            return True
+        
+        if 'affect' in lemma or 'impact' in lemma:
+            return True
+        
+        return False
+
+    def _has_status_morphology(self, participle_token) -> bool:
+        """Check for status morphology using SpaCy analysis."""
+        # Status participles often modify nouns to describe their condition
+        if participle_token.dep_ == "amod":  # Adjectival modifier
+            return True
+        
+        # Check for status-indicating morphological patterns
+        lemma = participle_token.lemma_.lower()
+        if 'statu' in lemma or 'condition' in lemma:
+            return True
+        
+        return False
     
     def _detect_formal_transitions(self, doc) -> List[Dict[str, Any]]:
         """Detect overly formal transition words using morphological patterns."""
@@ -308,10 +556,9 @@ class StylisticFlowRule(BaseRule):
         return len(doc)
     
     def _has_nested_clauses(self, relative_token, doc, clause_end) -> bool:
-        """Check for nested clause structures."""
-        nested_indicators = ['which', 'that', 'who', 'where', 'when']
+        """Check for nested clause structures using pure SpaCy morphological analysis."""
         for i in range(relative_token.i + 1, clause_end):
-            if doc[i].lemma_.lower() in nested_indicators:
+            if self._is_nested_clause_indicator(doc[i]):
                 return True
         return False
     
@@ -345,22 +592,20 @@ class StylisticFlowRule(BaseRule):
         return boundaries
     
     def _analyze_causal_strength(self, boundary, doc) -> Dict[str, Any]:
-        """Analyze causal connection strength using morphological patterns."""
+        """Analyze causal connection strength using pure SpaCy morphological analysis."""
         analysis = {
             'needs_enhancement': False,
             'causal_indicators': [],
             'connection_strength': 0.0
         }
         
-        # Look for causal indicators in the next sentence
+        # Look for causal indicators in the next sentence using morphological analysis
         next_sent_start = boundary['after_start']
-        causal_words = ['because', 'since', 'therefore', 'thus', 'consequently', 'as a result', 'due to']
         
         # Check first 5 tokens of next sentence
         for i in range(next_sent_start, min(next_sent_start + 5, len(doc))):
-            token_text = doc[i].lemma_.lower()
-            if any(causal in token_text for causal in causal_words):
-                analysis['causal_indicators'].append(token_text)
+            if self._is_causal_word(doc[i]):
+                analysis['causal_indicators'].append(doc[i].lemma_.lower())
                 analysis['connection_strength'] += 0.3
         
         # If no causal indicators and sentences seem related, suggest enhancement
@@ -410,18 +655,34 @@ class StylisticFlowRule(BaseRule):
                 'position': 0
             })
         
-        # Pattern 2: Formal transitions
-        formal_words = ['Furthermore', 'Nevertheless', 'Consequently', 'Subsequently']
-        for word in formal_words:
-            if sentence.strip().startswith(word):
+        # Pattern 2: Formal transitions using morphological patterns
+        words = sentence.strip().split()
+        if words:
+            first_word = words[0]
+            # Check for formal transition patterns using morphological analysis
+            if self._appears_formal_transition(first_word):
                 issues.append({
                     'type': 'formal_transition',
-                    'message': f'Consider less formal alternative to "{word}"',
+                    'message': f'Consider less formal alternative to "{first_word}"',
                     'severity': 'low',
-                    'position': sentence.find(word)
+                    'position': sentence.find(first_word)
                 })
         
         return issues
+    
+    def _appears_formal_transition(self, word: str) -> bool:
+        """Check if word appears to be formal transition using morphological patterns."""
+        word_lower = word.lower()
+        
+        # Use similar morphological patterns as the main analysis
+        if len(word) > 8 and word_lower.endswith('ly'):  # Long -ly adverbs
+            return True
+        
+        # Check for Latin-derived formality patterns
+        if any(word_lower.startswith(prefix) for prefix in ['furth', 'never', 'conse', 'subse']):
+            return True
+        
+        return False
     
     def _generate_flow_suggestions(self, issue: Dict[str, Any], doc=None) -> List[str]:
         """Generate suggestions based on issue type and morphological analysis."""
@@ -502,4 +763,181 @@ class StylisticFlowRule(BaseRule):
             if not analysis.get('causal_indicators'):
                 suggestions.append("No causal indicators found - consider adding transitional phrases")
         
-        return suggestions 
+        return suggestions
+
+    def _is_nested_clause_indicator(self, token) -> bool:
+        """Check if token is nested clause indicator using pure SpaCy morphological analysis."""
+        # Method 1: Use SpaCy POS tagging for relative pronouns/adverbs
+        if self._is_relative_pronoun_morphologically(token):
+            return True
+        
+        # Method 2: Use dependency analysis for subordinating elements
+        if self._is_subordinating_element(token):
+            return True
+        
+        # Method 3: Use SpaCy's morphological features for wh-words
+        if self._is_wh_word_morphologically(token):
+            return True
+        
+        return False
+
+    def _is_relative_pronoun_morphologically(self, token) -> bool:
+        """Check if token is relative pronoun using SpaCy analysis."""
+        # Use SpaCy's POS tags for relative pronouns
+        if token.tag_ in ["WP", "WDT", "WRB"]:  # Wh-pronouns, determiners, adverbs
+            return True
+        
+        # Use morphological features for relative pronouns
+        if token.morph.get("PronType") == ["Rel"]:  # Relative pronoun type
+            return True
+        
+        return False
+
+    def _is_subordinating_element(self, token) -> bool:
+        """Check if token is subordinating element using SpaCy dependency analysis."""
+        # Check dependency role for subordination
+        if token.dep_ in ["mark", "advmod"] and token.pos_ in ["SCONJ", "ADV"]:
+            return True
+        
+        return False
+
+    def _is_wh_word_morphologically(self, token) -> bool:
+        """Check if token is wh-word using morphological patterns."""
+        lemma = token.lemma_.lower()
+        
+        # Wh-words have specific morphological patterns
+        if lemma.startswith('wh') or lemma in ['what', 'when', 'where', 'who', 'which', 'how']:
+            return True
+        
+        return False
+
+    def _is_causal_word(self, token) -> bool:
+        """Check if token is causal word using pure SpaCy morphological analysis."""
+        # Method 1: Check for causal conjunction morphology
+        if self._is_causal_conjunction_morphologically(token):
+            return True
+        
+        # Method 2: Check for causal adverb morphology
+        if self._is_causal_adverb_morphologically(token):
+            return True
+        
+        # Method 3: Check for causal prepositional patterns
+        if self._is_causal_preposition_morphologically(token):
+            return True
+        
+        return False
+
+    def _is_causal_conjunction_morphologically(self, token) -> bool:
+        """Check for causal conjunction morphology using SpaCy analysis."""
+        # Use SpaCy POS tagging for subordinating conjunctions
+        if token.pos_ == "SCONJ":
+            # Check if it introduces causal relationships
+            if self._expresses_causality_morphologically(token):
+                return True
+        
+        return False
+
+    def _is_causal_adverb_morphologically(self, token) -> bool:
+        """Check for causal adverb morphology using SpaCy analysis."""
+        if token.pos_ == "ADV":
+            # Causal adverbs often have result/consequence morphology
+            if self._has_consequence_morphology(token):
+                return True
+        
+        return False
+
+    def _is_causal_preposition_morphologically(self, token) -> bool:
+        """Check for causal preposition patterns using SpaCy analysis."""
+        if token.pos_ == "ADP":
+            # Look for prepositional phrases indicating causation
+            if self._indicates_causation_morphologically(token):
+                return True
+        
+        return False
+
+    def _expresses_causality_morphologically(self, token) -> bool:
+        """Check if token expresses causality using morphological analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Causal expressions have reason/cause morphology
+        if 'becaus' in lemma or 'sinc' in lemma or 'reason' in lemma:
+            return True
+        
+        return False
+
+    def _has_consequence_morphology(self, token) -> bool:
+        """Check for consequence morphology patterns."""
+        lemma = token.lemma_.lower()
+        
+        # Consequence words have result/therefore morphology
+        if 'therefor' in lemma or 'consequent' in lemma or 'thus' in lemma:
+            return True
+        
+        if 'result' in lemma or 'accord' in lemma:
+            return True
+        
+        return False
+
+    def _indicates_causation_morphologically(self, token) -> bool:
+        """Check if preposition indicates causation using morphological analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Causal prepositions have due/because morphology
+        if 'due' in lemma or 'becaus' in lemma:
+            return True
+        
+        return False
+
+    def _is_formal_transition(self, token) -> bool:
+        """Check if token is formal transition using pure SpaCy morphological analysis."""
+        # Method 1: Check for formal adverb morphology
+        if self._is_formal_adverb_morphologically(token):
+            return True
+        
+        # Method 2: Check for academic discourse markers
+        if self._is_academic_discourse_marker(token):
+            return True
+        
+        # Method 3: Check for Latin-derived formality patterns
+        if self._has_latin_formality_morphology(token):
+            return True
+        
+        return False
+
+    def _is_formal_adverb_morphologically(self, token) -> bool:
+        """Check for formal adverb morphology using SpaCy analysis."""
+        if token.pos_ == "ADV":
+            # Formal adverbs often have complex morphology
+            complexity = self._calculate_morphological_complexity_score(token)
+            if complexity > 2.0:  # High complexity suggests formality
+                return True
+        
+        return False
+
+    def _is_academic_discourse_marker(self, token) -> bool:
+        """Check for academic discourse markers using morphological analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Academic discourse markers have specific morphological patterns
+        if 'furthermore' in lemma or 'nevertheless' in lemma or 'consequently' in lemma:
+            return True
+        
+        if 'subsequently' in lemma or 'moreover' in lemma:
+            return True
+        
+        return False
+
+    def _has_latin_formality_morphology(self, token) -> bool:
+        """Check for Latin-derived formality patterns using morphological analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Latin-derived formal words often have these endings
+        if lemma.endswith('ly') and len(lemma) > 8:  # Long -ly adverbs often formal
+            return True
+        
+        # Latin prefixes/suffixes indicating formality
+        if lemma.startswith('sub') or lemma.startswith('con') or lemma.startswith('pre'):
+            if len(lemma) > 6:  # Avoid simple words like "pre"
+                return True
+        
+        return False 

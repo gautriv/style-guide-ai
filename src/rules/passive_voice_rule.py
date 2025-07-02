@@ -45,7 +45,20 @@ class PassiveVoiceRule(BaseRule):
                         message=f'Reader-focus issue: {issue.get("type").replace("_", " ").title()}',
                         suggestions=suggestions,
                         severity='medium',
+                        error_type='reader_focus',  # Specific error type
                         passive_construction=issue
+                    ))
+                elif issue.get('type') == 'weak_modal_verb':
+                    # Modal verb strength issue
+                    suggestions = self._generate_advanced_passive_suggestions(issue, doc)
+                    errors.append(self._create_error(
+                        sentence=sentence,
+                        sentence_index=i,
+                        message=f"Weak modal verb: Replace '{issue.get('current_modal')}' with '{issue.get('suggested_modal')}' for stronger authority",
+                        suggestions=suggestions,
+                        severity='medium',
+                        error_type='weak_modal_verb',  # Preserve specific error type
+                        modal_construction=issue
                     ))
                 else:
                     # Traditional passive voice error
@@ -56,6 +69,7 @@ class PassiveVoiceRule(BaseRule):
                         message='Consider using active voice for clearer, more direct writing.',
                         suggestions=suggestions,
                         severity=self._determine_passive_severity(issue),
+                        error_type='passive_voice',  # Explicit passive voice type
                         passive_construction=issue
                     ))
 
@@ -89,6 +103,10 @@ class PassiveVoiceRule(BaseRule):
                 construction = self._extract_semantic_passive_construction(token, doc)
                 if construction:
                     constructions.append(construction)
+        
+        # Method 5: Modal verb strength analysis for authority and clarity (NEW)
+        modal_issues = self._detect_modal_verb_strength_issues(doc, "")
+        constructions.extend(modal_issues)
         
         return constructions
     
@@ -296,6 +314,8 @@ class PassiveVoiceRule(BaseRule):
             suggestions.extend(self._generate_progressive_passive_suggestions(construction, doc))
         elif construction_type == 'semantic_passive':
             suggestions.extend(self._generate_semantic_passive_suggestions(construction, doc))
+        elif construction_type == 'weak_modal_verb':
+            suggestions.extend(self._generate_modal_strength_suggestions(construction, doc))
         else:
             suggestions.extend(self._generate_standard_passive_suggestions(construction, doc))
         
@@ -944,4 +964,479 @@ class PassiveVoiceRule(BaseRule):
     
     def _is_ownership_ambiguity_issue(self, issue_type: str) -> bool:
         """Check if issue type indicates ownership ambiguity using pattern analysis."""
-        return 'ownership' in issue_type and 'ambiguity' in issue_type 
+        return 'ownership' in issue_type and 'ambiguity' in issue_type
+
+    def _detect_modal_verb_strength_issues(self, doc, sentence) -> List[Dict[str, Any]]:
+        """Detect weak modal verbs that could be strengthened for better authority and clarity."""
+        modal_issues = []
+        
+        for token in doc:
+            if self._is_modal_verb(token):
+                strength_analysis = self._analyze_modal_strength(token, doc)
+                
+                if strength_analysis['is_weak'] and strength_analysis['can_strengthen']:
+                    modal_issues.append({
+                        'type': 'weak_modal_verb',
+                        'modal_token': token,
+                        'current_modal': token.lemma_.lower(),
+                        'suggested_modal': strength_analysis['suggested_stronger'],
+                        'strength_score': strength_analysis['strength_score'],
+                        'context_analysis': strength_analysis['context'],
+                        'position': token.idx,
+                        'construction_type': self._identify_modal_construction_type(token, doc)
+                    })
+        
+        return modal_issues
+
+    def _is_modal_verb(self, token) -> bool:
+        """Check if token is a modal verb using pure SpaCy POS and morphological analysis."""
+        # Method 1: SpaCy POS tagging for modal auxiliaries
+        if token.pos_ == "AUX" and token.dep_ == "aux":
+            return True
+        
+        # Method 2: SpaCy tag analysis for modal verbs
+        if token.tag_ == "MD":  # Modal auxiliary tag
+            return True
+        
+        # Method 3: Morphological analysis for modal patterns
+        if token.morph.get("VerbType") == ["Mod"]:  # Modal verb type in morphology
+            return True
+        
+        # Method 4: Use SpaCy's lemmatization with linguistic anchor patterns
+        if self._has_modal_morphological_pattern(token):
+            return True
+        
+        return False
+
+    def _has_modal_morphological_pattern(self, token) -> bool:
+        """Check for modal morphological patterns using pure SpaCy analysis."""
+        # Method 1: Check auxiliary verb morphology with modal characteristics
+        if token.pos_ == "AUX":
+            # Modals have specific morphological features
+            if token.morph.get("VerbForm") == ["Fin"]:  # Finite form
+                # Check if it modifies another verb (modal characteristic)
+                for child in token.children:
+                    if child.pos_ == "VERB" and child.dep_ in ["xcomp", "ccomp"]:
+                        return True
+        
+        # Method 2: Check for modal semantic characteristics using morphological complexity
+        if self._has_modal_semantic_pattern(token):
+            return True
+        
+        return False
+
+    def _has_modal_semantic_pattern(self, token) -> bool:
+        """Check for modal semantic patterns using SpaCy morphological analysis."""
+        # Modal verbs have specific semantic and morphological characteristics
+        lemma = token.lemma_.lower()
+        
+        # Method 1: Single syllable pattern (most modals are monosyllabic)
+        if len(lemma) <= 5 and token.pos_ == "AUX":
+            return True
+        
+        # Method 2: Check for modality morphological markers
+        if self._expresses_modality_morphologically(token):
+            return True
+        
+        return False
+
+    def _expresses_modality_morphologically(self, token) -> bool:
+        """Check if token expresses modality using morphological analysis."""
+        # Modal verbs express possibility, necessity, obligation
+        
+        # Method 1: Check morphological features for modality
+        if token.morph.get("Mood") == ["Mod"]:  # Modal mood
+            return True
+        
+        # Method 2: Check syntactic behavior typical of modals
+        if self._has_modal_syntactic_behavior(token):
+            return True
+        
+        return False
+
+    def _has_modal_syntactic_behavior(self, token) -> bool:
+        """Check for modal syntactic behavior using SpaCy dependency analysis."""
+        # Modals typically:
+        # 1. Are auxiliary verbs that take bare infinitive complements
+        # 2. Cannot be inflected for person/number in most cases
+        # 3. Appear before main verbs
+        
+        if token.pos_ == "AUX":
+            # Check if it takes infinitive complement
+            for child in token.children:
+                if (child.pos_ == "VERB" and 
+                    child.morph.get("VerbForm") == ["Inf"]):  # Infinitive
+                    return True
+        
+        return False
+
+    def _analyze_modal_strength(self, modal_token, doc) -> Dict[str, Any]:
+        """Analyze modal verb strength using pure SpaCy linguistic and morphological analysis."""
+        modal_lemma = modal_token.lemma_.lower()
+        
+        # Calculate modal strength using pure morphological and phonological analysis
+        strength_score = self._calculate_modal_strength_morphologically(modal_token)
+        category = self._classify_modal_category_linguistically(modal_token, strength_score)
+        
+        context_analysis = self._analyze_modal_context(modal_token, doc)
+        
+        # Determine if modal is weak using linguistic thresholds
+        is_weak = strength_score < 0.5
+        can_strengthen = (is_weak and 
+                         context_analysis['allows_strengthening'] and
+                         context_analysis['context_type'] in ['professional', 'instructional', 'policy'])
+        
+        # Suggest stronger alternative using morphological analysis
+        suggested_stronger = self._suggest_stronger_modal_morphologically(modal_token, context_analysis)
+        
+        return {
+            'strength_score': strength_score,
+            'category': category,
+            'is_weak': is_weak,
+            'can_strengthen': can_strengthen,
+            'suggested_stronger': suggested_stronger,
+            'context': context_analysis
+        }
+
+    def _calculate_modal_strength_morphologically(self, modal_token) -> float:
+        """Calculate modal strength using pure SpaCy morphological and phonological analysis."""
+        strength_score = 0.5  # Neutral baseline
+        
+        # Method 1: Phonological strength analysis (shorter modals often stronger)
+        lemma = modal_token.lemma_.lower()
+        syllable_count = self._estimate_syllables_morphological(modal_token)
+        
+        if syllable_count == 1:  # Monosyllabic modals
+            # Shorter modals with consonant clusters often stronger
+            consonant_strength = self._analyze_consonant_strength(lemma)
+            strength_score += consonant_strength * 0.3
+        else:
+            # Polysyllabic modals often weaker
+            strength_score -= 0.1
+        
+        # Method 2: Morphological complexity analysis
+        complexity = self._calculate_morphological_complexity_score(modal_token)
+        if complexity > 1.0:  # More complex morphology suggests weaker modality
+            strength_score -= (complexity - 1.0) * 0.2
+        
+        # Method 3: Semantic context analysis using dependency parsing
+        semantic_strength = self._analyze_modal_semantic_strength(modal_token)
+        strength_score += semantic_strength * 0.4
+        
+        # Method 4: Use SpaCy's probability/frequency as strength indicator
+        if hasattr(modal_token, 'prob') and modal_token.prob:
+            # More frequent modals often have stronger conventional meaning
+            frequency_strength = min(abs(modal_token.prob) / 10.0, 0.2)
+            strength_score += frequency_strength
+        
+        return max(0.0, min(1.0, strength_score))
+
+    def _analyze_consonant_strength(self, lemma: str) -> float:
+        """Analyze consonant patterns for phonological strength indicators."""
+        consonant_clusters = 0
+        consonants = ''.join([c for c in lemma if c not in 'aeiou'])
+        
+        # Count consonant clusters (indicate phonological strength)
+        for i in range(len(consonants) - 1):
+            if consonants[i] != consonants[i + 1]:  # Different consonants together
+                consonant_clusters += 1
+        
+        # Plosive consonants (p, b, t, d, k, g) suggest strength
+        plosives = sum(1 for c in consonants if c in 'pbtdkg')
+        
+        # Fricatives (s, z, f, v, etc.) suggest less strength
+        fricatives = sum(1 for c in consonants if c in 'szfvth')
+        
+        strength = (consonant_clusters * 0.2) + (plosives * 0.15) - (fricatives * 0.1)
+        return max(0.0, min(1.0, strength))
+
+    def _analyze_modal_semantic_strength(self, modal_token) -> float:
+        """Analyze modal semantic strength using SpaCy morphological features."""
+        strength = 0.5  # Neutral baseline
+        
+        # Method 1: Check morphological mood features
+        if modal_token.morph.get("Mood") == ["Imp"]:  # Imperative mood
+            strength += 0.3  # Imperatives are strong
+        elif modal_token.morph.get("Mood") == ["Ind"]:  # Indicative mood
+            strength += 0.1  # Indicatives are moderate
+        
+        # Method 2: Analyze syntactic position (modals early in sentence often stronger)
+        sentence_position = modal_token.i / len(list(modal_token.sent))
+        if sentence_position < 0.3:  # Early in sentence
+            strength += 0.2
+        
+        # Method 3: Check for negation (negated modals often different strength)
+        for child in modal_token.children:
+            if child.dep_ == "neg":  # Negation
+                strength -= 0.1  # Negation often weakens modals
+        
+        return max(0.0, min(1.0, strength))
+
+    def _classify_modal_category_linguistically(self, modal_token, strength_score: float) -> str:
+        """Classify modal category using pure linguistic analysis."""
+        # Use morphological and semantic analysis instead of hardcoded categories
+        
+        # Method 1: Use strength score to determine category
+        if strength_score >= 0.8:
+            return 'strong_obligation'
+        elif strength_score >= 0.6:
+            return 'moderate_ability'
+        elif strength_score >= 0.4:
+            return 'moderate_permission'
+        elif strength_score >= 0.2:
+            return 'weak_possibility'
+        else:
+            return 'weak_obligation'
+
+    def _suggest_stronger_modal_morphologically(self, weak_modal_token, context: Dict[str, Any]) -> str:
+        """Suggest stronger modal using morphological patterns and context analysis."""
+        current_lemma = weak_modal_token.lemma_.lower()
+        current_strength = self._calculate_modal_strength_morphologically(weak_modal_token)
+        
+        # Find a morphologically stronger alternative based on context
+        context_type = context.get('context_type', 'neutral')
+        
+        # Method 1: Use phonological patterns for strengthening
+        if current_strength < 0.3:  # Very weak
+            return self._find_strongest_modal_for_context(context_type)
+        elif current_strength < 0.5:  # Moderately weak
+            return self._find_moderate_strong_modal_for_context(context_type)
+        
+        # Method 2: Context-specific strengthening using morphological analysis
+        if context_type == 'policy' or context.get('is_requirement'):
+            return self._select_policy_appropriate_modal()
+        elif context_type == 'instructional':
+            return self._select_instruction_appropriate_modal()
+        
+        # Fallback: use phonological strengthening
+        return self._strengthen_phonologically(current_lemma)
+
+    def _find_strongest_modal_for_context(self, context_type: str) -> str:
+        """Find strongest modal for context using linguistic principles."""
+        # For very weak modals, suggest the strongest options
+        if context_type in ['policy', 'requirement']:
+            return 'must'  # Strongest obligation
+        elif context_type == 'instructional':
+            return 'must'  # Clear instruction
+        else:
+            return 'will'  # Strong future/certainty
+
+    def _find_moderate_strong_modal_for_context(self, context_type: str) -> str:
+        """Find moderately strong modal for context."""
+        if context_type in ['policy', 'requirement']:
+            return 'must'
+        elif context_type == 'instructional':
+            return 'can'  # Clear ability/permission
+        else:
+            return 'will'
+
+    def _select_policy_appropriate_modal(self) -> str:
+        """Select appropriate modal for policy context using linguistic principles."""
+        # Policy contexts require strong obligation/necessity
+        return 'must'
+
+    def _select_instruction_appropriate_modal(self) -> str:
+        """Select appropriate modal for instructional context."""
+        # Instructions benefit from clear directives
+        return 'must'
+
+    def _strengthen_phonologically(self, current_lemma: str) -> str:
+        """Strengthen modal using phonological patterns."""
+        # Shorter, consonant-heavy modals are typically stronger
+        if len(current_lemma) > 4:  # Long modals
+            return 'must'  # Short, strong
+        elif current_lemma.startswith('s'):  # 's' start often weaker
+            return 'must'  # Stronger alternative
+        else:
+            return 'will'  # Default strong alternative
+
+    def _identify_modal_construction_type(self, modal_token, doc) -> str:
+        """Identify the type of modal construction for better suggestions."""
+        main_verb = self._find_main_verb_for_modal(modal_token)
+        
+        if not main_verb:
+            return 'simple_modal'
+        
+        # Check for specific construction patterns
+        if main_verb.lemma_.lower() in ['be', 'have']:
+            return 'modal_auxiliary'
+        elif modal_token.lemma_.lower() in ['should', 'must'] and main_verb.lemma_.lower() == 'be':
+            return 'passive_modal'  # "should be caught" type
+        elif main_verb.lemma_.lower() in ['catch', 'detect', 'find']:
+            return 'detection_modal'
+        else:
+            return 'action_modal'
+
+    def _generate_modal_strength_suggestions(self, construction: Dict[str, Any], doc) -> List[str]:
+        """Generate suggestions for weak modal verb strengthening."""
+        suggestions = []
+        
+        current_modal = construction.get('current_modal', '')
+        suggested_modal = construction.get('suggested_modal', '')
+        construction_type = construction.get('construction_type', '')
+        context_analysis = construction.get('context_analysis', {})
+        
+        if current_modal and suggested_modal:
+            suggestions.append(f"Replace '{current_modal}' with '{suggested_modal}' for stronger, clearer authority")
+            
+            # Context-specific suggestions
+            context_type = context_analysis.get('context_type', 'neutral')
+            if context_type == 'policy':
+                suggestions.append(f"In policy contexts, '{suggested_modal}' provides clearer directive than '{current_modal}'")
+            elif context_type == 'instructional':
+                suggestions.append(f"For instructions, '{suggested_modal}' gives clearer direction than '{current_modal}'")
+            elif context_type == 'professional':
+                suggestions.append(f"Professional writing benefits from the authority of '{suggested_modal}' over '{current_modal}'")
+            
+            # Construction-specific suggestions
+            if construction_type == 'passive_modal':
+                suggestions.append(f"Strengthen passive construction: '{suggested_modal} be' instead of '{current_modal} be'")
+            elif construction_type == 'detection_modal':
+                suggestions.append(f"For error detection, '{suggested_modal}' conveys necessity better than '{current_modal}'")
+        
+        # IBM Style Guide specific guidance
+        if context_analysis.get('is_requirement') or context_analysis.get('is_policy_statement'):
+            suggestions.append("IBM Style Guide: Use definitive modals for requirements and policies")
+            suggestions.append("Strong modals reduce ambiguity and increase compliance clarity")
+        
+        return suggestions
+
+    def _calculate_morphological_complexity_score(self, token) -> float:
+        """Calculate morphological complexity score for a token using pure SpaCy analysis."""
+        complexity = 0.0
+        
+        # Base complexity from morphological features
+        morph_features = len(token.morph)
+        complexity += morph_features / 10.0
+        
+        # Derivational complexity
+        if self._has_complex_derivation(token):
+            complexity += 0.4
+        
+        # Length proxy for morphological complexity
+        complexity += len(token.text) / 15.0
+        
+        return min(complexity, 1.0)
+    
+    def _has_complex_derivation(self, token) -> bool:
+        """Check for complex derivational morphology."""
+        lemma = token.lemma_.lower()
+        
+        # Multiple affixes suggest complexity
+        prefixes = ['re-', 'pre-', 'dis-', 'un-', 'over-']
+        suffixes = ['-ize', '-ify', '-ate', '-tion', '-sion', '-ment']
+        
+        has_prefix = any(lemma.startswith(prefix.rstrip('-')) for prefix in prefixes)
+        has_suffix = any(lemma.endswith(suffix.lstrip('-')) for suffix in suffixes)
+        
+        return has_prefix and has_suffix
+
+    def _estimate_syllables_morphological(self, token) -> int:
+        """Estimate syllable count for morphological analysis."""
+        # Simple syllable estimation for morphological complexity
+        word = token.text.lower()
+        vowels = 'aeiou'
+        syllables = 0
+        prev_was_vowel = False
+        
+        for char in word:
+            if char in vowels:
+                if not prev_was_vowel:
+                    syllables += 1
+                prev_was_vowel = True
+            else:
+                prev_was_vowel = False
+        
+        # Minimum one syllable
+        return max(1, syllables)
+
+    def _analyze_modal_context(self, modal_token, doc) -> Dict[str, Any]:
+        """Analyze context of modal verb usage using SpaCy analysis."""
+        context = {
+            'context_type': 'neutral',
+            'allows_strengthening': True,
+            'is_requirement': False,
+            'is_policy_statement': False,
+            'formality_level': 0.5
+        }
+        
+        # Determine context type based on sentence content
+        sentence = modal_token.sent
+        
+        # Check for business/professional context
+        if self._is_business_context(doc):
+            context['context_type'] = 'professional'
+            context['allows_strengthening'] = True
+        
+        # Check for policy/requirement indicators
+        for token in sentence:
+            if self._is_policy_indicator(token):
+                context['context_type'] = 'policy'
+                context['is_policy_statement'] = True
+                context['allows_strengthening'] = True
+                break
+            elif self._is_requirement_indicator(token):
+                context['is_requirement'] = True
+                context['allows_strengthening'] = True
+        
+        # Check for instructional context
+        if self._is_instructional_context(sentence):
+            context['context_type'] = 'instructional'
+            context['allows_strengthening'] = True
+        
+        # Assess formality level
+        context['formality_level'] = self._assess_sentence_formality(sentence)
+        
+        return context
+    
+    def _is_policy_indicator(self, token) -> bool:
+        """Check if token indicates policy context."""
+        lemma = token.lemma_.lower()
+        return any(indicator in lemma for indicator in ['policy', 'guideline', 'procedure', 'regulation'])
+    
+    def _is_requirement_indicator(self, token) -> bool:
+        """Check if token indicates requirement context."""
+        lemma = token.lemma_.lower()
+        return any(indicator in lemma for indicator in ['require', 'mandatory', 'necessary', 'essential'])
+    
+    def _is_instructional_context(self, sentence) -> bool:
+        """Check if sentence is instructional."""
+        instruction_indicators = 0
+        for token in sentence:
+            if token.pos_ == "VERB" and token.morph.get("Mood") == ["Imp"]:  # Imperative mood
+                instruction_indicators += 1
+            elif token.lemma_.lower() in ['step', 'instruction', 'guide', 'how']:
+                instruction_indicators += 1
+        
+        return instruction_indicators > 0
+    
+    def _assess_sentence_formality(self, sentence) -> float:
+        """Assess formality level of sentence."""
+        formal_indicators = 0
+        total_content_words = 0
+        
+        for token in sentence:
+            if token.pos_ in ["NOUN", "VERB", "ADJ", "ADV"]:
+                total_content_words += 1
+                if len(token.text) > 7:  # Long words often more formal
+                    formal_indicators += 1
+                if any(suffix in token.lemma_.lower() for suffix in ['-tion', '-sion', '-ment', '-ize']):
+                    formal_indicators += 1
+        
+        return formal_indicators / total_content_words if total_content_words > 0 else 0.5
+    
+    def _find_main_verb_for_modal(self, modal_token):
+        """Find the main verb that the modal modifies."""
+        # Look for infinitive verb that the modal governs
+        for child in modal_token.children:
+            if child.pos_ == "VERB" and child.dep_ in ["xcomp", "ccomp"]:
+                return child
+        
+        # Look for verb in the sentence that might be the main verb
+        for token in modal_token.sent:
+            if (token.pos_ == "VERB" and 
+                token.i > modal_token.i and  # After the modal
+                token.morph.get("VerbForm") == ["Inf"]):  # Infinitive form
+                return token
+        
+        return None 

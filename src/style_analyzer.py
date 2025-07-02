@@ -145,13 +145,20 @@ class StyleAnalyzer:
             # Calculate overall score
             overall_score = self._calculate_overall_score(errors, statistics, technical_metrics)
             
-            return {
+            # Flatten key statistics to top level for compatibility
+            result = {
                 'errors': errors,
                 'suggestions': suggestions,
                 'statistics': statistics,
                 'technical_writing_metrics': technical_metrics,
-                'overall_score': overall_score
+                'overall_score': overall_score,
+                # Flatten essential statistics to top level for frontend compatibility
+                'word_count': statistics.get('word_count', 0),
+                'sentence_count': statistics.get('sentence_count', 0),
+                'readability_score': statistics.get('flesch_reading_ease', 0)
             }
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error in style analysis: {str(e)}")

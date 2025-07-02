@@ -34,7 +34,7 @@ except ImportError as e:
     print(f"⚠️ Style analyzer not available - {e}")
 
 try:
-    from src.ai_rewriter import AIRewriter
+    from rewriter import AIRewriter
     AI_REWRITER_AVAILABLE = True
     print("✅ AIRewriter imported successfully")
 except ImportError as e:
@@ -432,7 +432,7 @@ def index():
                     document.getElementById('errorCount').textContent = analysis.errors.length;
                     document.getElementById('readabilityScore').textContent = analysis.readability_score || 'N/A';
                     
-                    let html = '<div class="result"><h3>�� Analysis Results</h3>';
+                    let html = '<div class="result"><h3>Analysis Results</h3>';
                     
                     if (analysis.errors.length === 0) {
                         html += '<div class="success">✅ No major style issues detected!</div>';
@@ -615,11 +615,13 @@ def rewrite_content():
         def progress_callback(step, status, detail, progress):
             emit_progress(session_id, step, status, detail, progress)
         
-        # Create AI rewriter with progress callback
+        # Create AI rewriter with progress callback using system info
+        system_info = ai_rewriter.get_system_info()
+        model_info = system_info.get('model_info', {})
+        
         progress_ai_rewriter = AIRewriter(
-            model_name=ai_rewriter.model_name,
-            use_ollama=ai_rewriter.use_ollama,
-            ollama_model=ai_rewriter.ollama_model,
+            use_ollama=model_info.get('use_ollama', True),
+            ollama_model=model_info.get('ollama_model', 'llama3:8b'),
             progress_callback=progress_callback
         )
         
@@ -666,11 +668,13 @@ def refine_content():
         def progress_callback(step, status, detail, progress):
             emit_progress(session_id, step, status, detail, progress)
         
-        # Create AI rewriter with progress callback
+        # Create AI rewriter with progress callback using system info
+        system_info = ai_rewriter.get_system_info()
+        model_info = system_info.get('model_info', {})
+        
         progress_ai_rewriter = AIRewriter(
-            model_name=ai_rewriter.model_name,
-            use_ollama=ai_rewriter.use_ollama,
-            ollama_model=ai_rewriter.ollama_model,
+            use_ollama=model_info.get('use_ollama', True),
+            ollama_model=model_info.get('ollama_model', 'llama3:8b'),
             progress_callback=progress_callback
         )
         

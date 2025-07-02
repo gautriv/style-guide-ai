@@ -41,16 +41,23 @@ class RulesRegistry:
                 rel_path = os.path.relpath(root, rules_dir)
                 
                 # Skip __pycache__ directories and hidden directories
-                if '__pycache__' in root or any(part.startswith('.') for part in rel_path.split(os.sep)):
+                # Special case: don't skip the main directory when rel_path is '.'
+                if '__pycache__' in root:
+                    continue
+                
+                # Skip hidden directories, but not the main directory
+                if rel_path != '.' and any(part.startswith('.') for part in rel_path.split(os.sep)):
                     continue
                 
                 # Calculate nesting depth
                 if rel_path == '.':
                     depth = 0
                     path_parts = []
+                    display_location = "main"
                 else:
                     path_parts = rel_path.split(os.sep)
                     depth = len(path_parts)
+                    display_location = ' > '.join(path_parts)
                 
                 # Limit depth to 4 levels as requested
                 if depth > 4:
@@ -58,51 +65,43 @@ class RulesRegistry:
                     continue
                 
                 # Process all Python files ending with '_rule.py' or '.py' (to be more flexible)
-                for filename in files:
-                    if filename.endswith('_rule.py') and filename != 'base_rule.py':
-                        module_name = filename[:-3]  # Remove .py extension
+                rule_files = [f for f in files if f.endswith('_rule.py') and f != 'base_rule.py']
+                
+                for filename in rule_files:
+                    module_name = filename[:-3]  # Remove .py extension
+                    
+                    try:
+                        # Determine import path and display location based on directory structure
+                        if rel_path == '.':
+                            # Main rules directory
+                            import_path = module_name
+                        else:
+                            # Nested subdirectory - convert path separators to dots
+                            subdir_path = rel_path.replace(os.sep, '.')
+                            import_path = f"{subdir_path}.{module_name}"
                         
-                        try:
-                            # Determine import path and display location based on directory structure
-                            if rel_path == '.':
-                                # Main rules directory
-                                import_path = module_name
-                                display_location = "main"
-                            else:
-                                # Nested subdirectory - convert path separators to dots
-                                subdir_path = rel_path.replace(os.sep, '.')
-                                import_path = f"{subdir_path}.{module_name}"
-                                display_location = ' > '.join(path_parts)
+                        # Import the module using enhanced import mechanism
+                        module = self._import_rule_module_enhanced(import_path, root, filename, depth)
+                        
+                        if module:
+                            # Find and instantiate the rule class
+                            rule_instance = self._find_and_instantiate_rule_class(module, module_name)
                             
-                            print(f"🔍 Attempting to load: {import_path} (depth: {depth})")
-                            
-                            # Import the module using enhanced import mechanism
-                            module = self._import_rule_module_enhanced(import_path, root, filename, depth)
-                            
-                            if module:
-                                # Find and instantiate the rule class
-                                rule_instance = self._find_and_instantiate_rule_class(module, module_name)
+                            if rule_instance:
+                                rule_type = rule_instance.rule_type
                                 
-                                if rule_instance:
-                                    rule_type = rule_instance.rule_type
-                                    
-                                    # Check for rule type conflicts
-                                    if rule_type in self.rules:
-                                        print(f"⚠️ Rule type conflict: {rule_type} already exists from {self.rule_locations[rule_type]}")
-                                        print(f"   Keeping existing rule, skipping: {display_location}")
-                                    else:
-                                        self.rules[rule_type] = rule_instance
-                                        self.rule_locations[rule_type] = display_location
-                                        print(f"✅ Loaded rule: {rule_type} (from {display_location})")
+                                # Check for rule type conflicts
+                                if rule_type in self.rules:
+                                    print(f"⚠️ Rule type conflict: {rule_type} already exists from {self.rule_locations[rule_type]}")
+                                    print(f"   Keeping existing rule, skipping: {display_location}")
                                 else:
-                                    print(f"⚠️ No valid rule class found in {import_path}")
-                            else:
-                                print(f"❌ Failed to import module: {import_path}")
-                                
-                        except Exception as e:
-                            print(f"❌ Error loading rule {import_path}: {e}")
-                            # Continue with next rule instead of stopping
+                                    self.rules[rule_type] = rule_instance
+                                    self.rule_locations[rule_type] = display_location
                             
+                    except Exception as e:
+                        print(f"❌ Error loading rule {import_path}: {e}")
+                        # Continue with next rule instead of stopping
+                        
         except Exception as e:
             print(f"❌ Critical error in rules registry initialization: {e}")
             
@@ -114,16 +113,31 @@ class RulesRegistry:
             # Method 1: Try direct file-based import (most reliable for nested modules)
             file_path = os.path.join(file_dir, filename)
             
-            # Create a unique module name to avoid conflicts
-            unique_module_name = f"rule_module_{import_path.replace('.', '_')}"
+            # For main directory rules, ensure the rules directory is in sys.path
+            # This helps with imports like "from base_rule import BaseRule"
+            import sys
+            rules_dir = os.path.dirname(os.path.abspath(__file__))
+            if rules_dir not in sys.path:
+                sys.path.insert(0, rules_dir)
+                path_added = True
+            else:
+                path_added = False
             
-            spec = importlib.util.spec_from_file_location(unique_module_name, file_path)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                return module
-            
-            raise ImportError(f"Could not create spec for {import_path}")
+            try:
+                # Create a unique module name to avoid conflicts
+                unique_module_name = f"rule_module_{import_path.replace('.', '_')}"
+                
+                spec = importlib.util.spec_from_file_location(unique_module_name, file_path)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    return module
+                
+                raise ImportError(f"Could not create spec for {import_path}")
+            finally:
+                # Clean up sys.path if we added to it
+                if path_added and rules_dir in sys.path:
+                    sys.path.remove(rules_dir)
             
         except Exception as e:
             print(f"🔄 Direct import failed for {import_path}, trying fallback methods: {e}")
@@ -176,18 +190,13 @@ class RulesRegistry:
                     try:
                         # Instantiate the rule
                         instance = attr()
-                        print(f"✅ Found and instantiated rule class: {attr.__name__}")
                         return instance
                     except Exception as inst_err:
-                        print(f"⚠️ Found rule class {attr.__name__} but failed to instantiate: {inst_err}")
                         continue
             
-            # If no rule class found, log warning
-            print(f"⚠️ No rule class found in module {module_name}")
             return None
             
         except Exception as e:
-            print(f"⚠️ Failed to find rule class in {module_name}: {e}")
             return None
     
     def _is_rule_class(self, cls) -> bool:

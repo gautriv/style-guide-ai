@@ -9,10 +9,10 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 try:
-    from .ai_rewriter import AIRewriter
+    from ..rewriter import AIRewriter
     from .format_preserving_processor import DocumentSegment, StructureType, FormatPreservingProcessor
 except ImportError:
-    from ai_rewriter import AIRewriter
+    from rewriter import AIRewriter
     from format_preserving_processor import DocumentSegment, StructureType, FormatPreservingProcessor
 
 logger = logging.getLogger(__name__)

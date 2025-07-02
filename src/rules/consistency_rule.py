@@ -607,32 +607,108 @@ class ConsistencyRule(BaseRule):
         return inconsistencies[:5]  # Limit to avoid too many false positives
     
     def _extract_ai_ml_concepts(self, doc) -> Dict[str, List[Dict[str, Any]]]:
-        """Extract AI/ML related concepts that might be missed by standard NER."""
+        """Extract AI/ML related concepts using pure SpaCy morphological analysis."""
         ai_ml_concepts = defaultdict(list)
         
-        # Define AI/ML term groups using domain knowledge
-        ai_terms = ['ai', 'artificial intelligence', 'machine learning', 'ml', 'deep learning', 'neural network']
-        
-        text_lower = doc.text.lower()
-        
-        # Find AI/ML terms in the text
+        # Find AI/ML terms using morphological analysis
         found_terms = []
-        for term in ai_terms:
-            if term in text_lower:
-                # Find actual positions in the document
-                for token in doc:
-                    if term.replace(' ', '') in token.text.lower() or \
-                       (len(term.split()) > 1 and term.split()[0] in token.text.lower()):
-                        found_terms.append({
-                            'text': token.text,
-                            'lemma': token.lemma_.lower(),
-                            'pos': token.pos_,
-                            'index': token.i,
-                            'vector': token.vector if token.has_vector else None,
-                            'type': 'ai_ml_term'
-                        })
+        
+        for token in doc:
+            if self._is_ai_technology_term(token, doc):
+                found_terms.append({
+                    'text': token.text,
+                    'lemma': token.lemma_.lower(),
+                    'pos': token.pos_,
+                    'index': token.i,
+                    'vector': token.vector if token.has_vector else None,
+                    'type': 'ai_ml_term'
+                })
         
         if found_terms:
             ai_ml_concepts['ai_ml_concept'].extend(found_terms)
         
-        return ai_ml_concepts 
+        return ai_ml_concepts
+
+    def _is_ai_technology_term(self, token, doc) -> bool:
+        """Check if token is AI/technology term using pure SpaCy morphological analysis."""
+        # Method 1: Use SpaCy's lemmatization and morphological patterns
+        if self._has_ai_morphological_pattern(token):
+            return True
+        
+        # Method 2: Use technological terminology patterns
+        if self._has_technology_morphology(token):
+            return True
+        
+        # Method 3: Use compound word analysis for multi-word terms
+        if self._is_compound_technology_term(token, doc):
+            return True
+        
+        return False
+
+    def _has_ai_morphological_pattern(self, token) -> bool:
+        """Check for AI morphological patterns using SpaCy analysis."""
+        lemma = token.lemma_.lower()
+        
+        # AI terms often have specific morphological patterns
+        if 'artificial' in lemma or 'intelligence' in lemma:
+            return True
+        
+        # Machine learning morphology patterns
+        if 'machine' in lemma or 'learning' in lemma:
+            return True
+        
+        # Neural network patterns
+        if 'neural' in lemma or 'network' in lemma:
+            return True
+        
+        return False
+
+    def _has_technology_morphology(self, token) -> bool:
+        """Check for technology morphology patterns using SpaCy analysis."""
+        lemma = token.lemma_.lower()
+        
+        # Technology terms often have computational morphology
+        if 'algorithm' in lemma or 'compute' in lemma or 'process' in lemma:
+            return True
+        
+        # Data science patterns
+        if 'data' in lemma or 'analyz' in lemma or 'model' in lemma:
+            return True
+        
+        return False
+
+    def _is_compound_technology_term(self, token, doc) -> bool:
+        """Check for compound technology terms using SpaCy dependency analysis."""
+        # Look for compound relationships that form technology terms
+        if token.dep_ == "compound":
+            head = token.head
+            # Check if this forms a technology compound
+            if self._forms_technology_compound(token, head):
+                return True
+        
+        # Check if this token is head of a technology compound
+        for child in token.children:
+            if child.dep_ == "compound" and self._forms_technology_compound(child, token):
+                return True
+        
+        return False
+
+    def _forms_technology_compound(self, modifier, head) -> bool:
+        """Check if modifier + head forms technology compound using morphological analysis."""
+        modifier_lemma = modifier.lemma_.lower()
+        head_lemma = head.lemma_.lower()
+        
+        # Common technology compound patterns
+        if 'machine' in modifier_lemma and 'learn' in head_lemma:
+            return True
+        
+        if 'deep' in modifier_lemma and 'learn' in head_lemma:
+            return True
+        
+        if 'artificial' in modifier_lemma and 'intellig' in head_lemma:
+            return True
+        
+        if 'neural' in modifier_lemma and 'network' in head_lemma:
+            return True
+        
+        return False 

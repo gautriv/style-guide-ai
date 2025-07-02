@@ -551,13 +551,16 @@ class BaseRule(ABC):
     
     def _create_error(self, sentence: str, sentence_index: int, message: str, 
                      suggestions: List[str], severity: str = 'medium', 
-                     **extra_data) -> Dict[str, Any]:
+                     error_type: str = None, **extra_data) -> Dict[str, Any]:
         """Create standardized error dictionary with proper serialization."""
         if severity not in self.severity_levels:
             severity = 'medium'
         
+        # Use provided error_type or fall back to rule_type
+        final_type = error_type if error_type is not None else self.rule_type
+        
         error = {
-            'type': self.rule_type,
+            'type': final_type,
             'message': str(message),
             'suggestions': [str(s) for s in suggestions],
             'sentence': str(sentence),
